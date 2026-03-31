@@ -1,0 +1,5 @@
+{
+  "name": "SokoSense AI",
+  "description": "The Farmer's Market Negotiator. Real-time market price prediction and selling advice in Sheng and English.",
+  "requestFramePermissions": ["microphone"]
+}
