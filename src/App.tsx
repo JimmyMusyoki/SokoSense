@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useState, useRef, useEffect, Component, ReactNode } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Send, Mic, TrendingUp, ShoppingBag, Loader2, Info, ChevronRight } from "lucide-react";
 import Markdown from "react-markdown";
 import { extractMarketInfo, generateAdvice } from "./services/geminiService";
@@ -18,7 +18,67 @@ interface Message {
   };
 }
 
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center bg-white min-h-screen flex flex-col items-center justify-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h1>
+          <div className="bg-gray-100 p-4 rounded text-left overflow-auto max-w-full inline-block border border-gray-200 shadow-sm">
+            <p className="font-mono text-sm text-red-500 mb-2 font-bold">{this.state.error?.name}: {this.state.error?.message}</p>
+            <pre className="text-xs text-gray-600 whitespace-pre-wrap">
+              {this.state.error?.stack}
+            </pre>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 px-6 py-2 bg-[#2E7D32] text-white rounded-full font-bold shadow-lg hover:bg-[#1B5E20] transition-colors"
+          >
+            Reload App
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function App() {
+  console.log("SokoSense AI App rendering...");
+  
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error("Global error caught:", event.error);
+    };
+    window.addEventListener("error", handleError);
+    return () => window.removeEventListener("error", handleError);
+  }, []);
+
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
+  );
+}
+
+function MainApp() {
+  console.log("MainApp rendering...");
+  console.log("API Key present:", !!process.env.GEMINI_API_KEY);
+
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
     {

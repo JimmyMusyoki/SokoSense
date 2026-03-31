@@ -1,9 +1,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ExtractionResult } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI() {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("GEMINI_API_KEY is not defined in environment variables.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey: apiKey || "" });
+  }
+  return aiInstance;
+}
 
 export async function extractMarketInfo(userInput: string): Promise<ExtractionResult> {
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `Extract the following information from the user's message about their produce:
@@ -16,6 +28,7 @@ export async function extractMarketInfo(userInput: string): Promise<ExtractionRe
     User message: "${userInput}"`,
     config: {
       responseMimeType: "application/json",
+      maxOutputTokens: 256,
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -40,6 +53,7 @@ export async function generateAdvice(
   tomorrowPrice: number,
   market: string
 ): Promise<string> {
+  const ai = getAI();
   const diff = tomorrowPrice - todayPrice;
   const advice = diff > 0 ? "Wait until tomorrow to sell." : "Sell today.";
   
@@ -60,6 +74,7 @@ export async function generateAdvice(
     "Soko ya Wakulima kesho bei ya nyanya itakuwa KES 95/kg. Subiri hadi kesho. Leo bei ni KES 70/kg — utapoteza pesa."`,
     config: {
       systemInstruction: "You are a helpful AI market negotiator for Kenyan farmers. You speak a mix of Sheng and English. Your advice is based on real market data and predictions.",
+      maxOutputTokens: 512,
     },
   });
 
