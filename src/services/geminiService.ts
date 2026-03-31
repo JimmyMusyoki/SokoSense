@@ -14,22 +14,87 @@ function getAI() {
   return aiInstance;
 }
 
+function safeJsonParse(text: string): any {
+  if (!text) return null;
+  
+  // Remove potential markdown blocks
+  let cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
+  
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    // Attempt to find the first '{' and last '}'
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    
+    if (start !== -1) {
+      // If we found a start but no end, it might be truncated
+      const jsonSub = end !== -1 ? cleaned.substring(start, end + 1) : cleaned.substring(start);
+      
+      try {
+        return JSON.parse(jsonSub);
+      } catch (e2) {
+        // Aggressive repair for common AI mistakes
+        let repaired = jsonSub
+          // Replace single quotes with double quotes (basic)
+          .replace(/'/g, '"')
+          // Remove trailing commas before closing braces/brackets
+          .replace(/,\s*([}\]])/g, "$1")
+          // Ensure keys are quoted (very basic check for word: value)
+          .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+
+        // If it was truncated (no closing brace), try to close it
+        if (end === -1 || !jsonSub.includes("}")) {
+          let temp = repaired;
+          // Try adding up to 3 closing braces
+          for (let i = 0; i < 3; i++) {
+            temp += "}";
+            try { return JSON.parse(temp); } catch (err) {}
+          }
+        }
+
+        try {
+          return JSON.parse(repaired);
+        } catch (e3) {
+          console.error("Failed to parse JSON even after repair attempts. Original text:", text);
+          throw e3;
+        }
+      }
+    }
+    throw e;
+  }
+}
+
 export async function extractMarketInfo(userInput: string): Promise<ExtractionResult> {
   const ai = getAI();
+  const today = "2026-03-31";
+  
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Extract the following information from the user's message about their produce:
-      - crop (e.g., tomatoes, potatoes, maize)
-      - quantity (number)
-      - unit (e.g., gunia, debe, kg)
-      - date (YYYY-MM-DD, default to 2026-03-31 if not specified)
-      - market (default to "Wakulima" if not specified)
-
-      User message: "${userInput}"`,
+      model: "gemini-3.1-pro-preview",
+      contents: `Extract market info from this message: "${userInput}"`,
       config: {
+        systemInstruction: `You are a specialized data extraction engine. 
+        Your ONLY output must be a valid JSON object. 
+        NO markdown, NO preamble, NO postamble.
+        
+        Schema:
+        {
+          "crop": string,
+          "quantity": number,
+          "unit": string,
+          "date": string (YYYY-MM-DD),
+          "market": string
+        }
+        
+        Defaults:
+        - date: "${today}"
+        - market: "Wakulima"
+        - crop: "tomatoes"
+        - quantity: 1
+        - unit: "gunia"`,
         responseMimeType: "application/json",
-        maxOutputTokens: 256,
+        maxOutputTokens: 1024,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -46,31 +111,21 @@ export async function extractMarketInfo(userInput: string): Promise<ExtractionRe
 
     const text = response.text;
     if (!text) {
-      throw new Error("Gemini returned an empty response.");
+      const candidateText = response.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!candidateText) {
+        throw new Error("Gemini returned an empty response.");
+      }
+      return safeJsonParse(candidateText);
     }
 
-    // Clean up the response text in case it contains markdown code blocks
-    const jsonString = text.replace(/```json\n?|\n?```/g, "").trim();
-    
-    try {
-      return JSON.parse(jsonString);
-    } catch (parseError) {
-      console.error("Failed to parse JSON from Gemini:", text);
-      // Attempt to find JSON-like structure if parsing the whole string failed
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw parseError;
-    }
+    return safeJsonParse(text);
   } catch (error) {
     console.error("Error in extractMarketInfo:", error);
-    // Return a sensible default to prevent the app from crashing
     return {
-      crop: "nyanya", // Default to tomatoes as it's common
+      crop: "tomatoes",
       quantity: 1,
       unit: "gunia",
-      date: "2026-03-31",
+      date: today,
       market: "Wakulima"
     };
   }
@@ -88,7 +143,7 @@ export async function generateAdvice(
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-pro-preview",
       contents: `You are SokoSense AI, a market negotiator for farmers in Kenya.
       The user said: "${userInput}"
       
