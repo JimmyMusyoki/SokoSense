@@ -8,6 +8,8 @@ function getAI() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.error("GEMINI_API_KEY is not defined in environment variables.");
+    } else {
+      console.log("GEMINI_API_KEY found, length:", apiKey.length, "starts with:", apiKey.substring(0, 4));
     }
     aiInstance = new GoogleGenAI({ apiKey: apiKey || "" });
   }
@@ -71,7 +73,7 @@ export async function extractMarketInfo(userInput: string): Promise<ExtractionRe
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `Extract market info from this message: "${userInput}"`,
       config: {
         systemInstruction: `You are a specialized data extraction engine. 
@@ -80,7 +82,7 @@ export async function extractMarketInfo(userInput: string): Promise<ExtractionRe
         
         Schema:
         {
-          "crop": string,
+          "crop": string (e.g., "tomatoes", "onions", "beans", "cabbage", "carrots", "sukuma wiki", "avocado", "maize", "potatoes", "bananas", "mangoes", "watermelon", "pineapple", "capsicum", "garlic", "ginger", "sweet potatoes", "cassava", "coffee", "tea", "macadamia", "passion fruit", "oranges", "lemons", "spinach", "managu", "terere", "sagaa", "kunde", "arrowroots", "wheat", "rice", "sorghum", "millet", "green grams", "cowpeas", "pigeon peas", "groundnuts", "sunflowers", "soya beans", "pumpkin", "cucumber", "eggplant", "broccoli", "cauliflower", "lettuce", "celery", "parsley", "coriander", "mint", "rosemary", "thyme", "basil", "turmeric", "chili", "black pepper", "cardamom", "cinnamon", "cloves", "vanilla", "cocoa", "tobacco", "cotton", "pyrethrum", "sisal", "sugar cane"),
           "quantity": number,
           "unit": string,
           "date": string (YYYY-MM-DD),
@@ -121,6 +123,10 @@ export async function extractMarketInfo(userInput: string): Promise<ExtractionRe
     return safeJsonParse(text);
   } catch (error) {
     console.error("Error in extractMarketInfo:", error);
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     return {
       crop: "tomatoes",
       quantity: 1,
@@ -143,7 +149,7 @@ export async function generateAdvice(
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `You are SokoSense AI, a market negotiator for farmers in Kenya.
       The user said: "${userInput}"
       
@@ -166,6 +172,10 @@ export async function generateAdvice(
     return response.text || "Samahani, sijapata jibu kwa sasa. Hebu jaribu tena.";
   } catch (error) {
     console.error("Error in generateAdvice:", error);
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     return "Pole sana, nimepata shida kidogo kuunganisha na soko. Jaribu tena baada ya muda mfupi.";
   }
 }

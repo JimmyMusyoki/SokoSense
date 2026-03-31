@@ -13,5 +13,17 @@
   { "date": "2026-03-29", "market": "Wakulima", "crop": "maize", "price_per_kg": 41, "demand_index": 0.4 },
   { "date": "2026-03-30", "market": "Wakulima", "crop": "maize", "price_per_kg": 42, "demand_index": 0.5 },
   { "date": "2026-03-31", "market": "Wakulima", "crop": "maize", "price_per_kg": 65, "demand_index": 0.9 },
-  { "date": "2026-04-01", "market": "Wakulima", "crop": "maize", "price_per_kg": 75, "demand_index": 1.1 }
+  { "date": "2026-04-01", "market": "Wakulima", "crop": "maize", "price_per_kg": 75, "demand_index": 1.1 },
+  { "date": "2026-03-31", "market": "Wakulima", "crop": "onions", "price_per_kg": 120, "demand_index": 0.8 },
+  { "date": "2026-04-01", "market": "Wakulima", "crop": "onions", "price_per_kg": 135, "demand_index": 1.0 },
+  { "date": "2026-03-31", "market": "Wakulima", "crop": "beans", "price_per_kg": 150, "demand_index": 0.7 },
+  { "date": "2026-04-01", "market": "Wakulima", "crop": "beans", "price_per_kg": 165, "demand_index": 0.9 },
+  { "date": "2026-03-31", "market": "Wakulima", "crop": "cabbage", "price_per_kg": 30, "demand_index": 0.5 },
+  { "date": "2026-04-01", "market": "Wakulima", "crop": "cabbage", "price_per_kg": 45, "demand_index": 0.8 },
+  { "date": "2026-03-31", "market": "Wakulima", "crop": "carrots", "price_per_kg": 60, "demand_index": 0.6 },
+  { "date": "2026-04-01", "market": "Wakulima", "crop": "carrots", "price_per_kg": 75, "demand_index": 0.9 },
+  { "date": "2026-03-31", "market": "Wakulima", "crop": "sukuma wiki", "price_per_kg": 25, "demand_index": 0.4 },
+  { "date": "2026-04-01", "market": "Wakulima", "crop": "sukuma wiki", "price_per_kg": 40, "demand_index": 0.7 },
+  { "date": "2026-03-31", "market": "Wakulima", "crop": "avocado", "price_per_kg": 15, "demand_index": 0.9 },
+  { "date": "2026-04-01", "market": "Wakulima", "crop": "avocado", "price_per_kg": 25, "demand_index": 1.2 }
 ]

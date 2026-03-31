@@ -1,0 +1,172 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - phoneNumber: string (required)
+    //   - displayName: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: listings
+    // Document ID: {listingId}
+    // Fields:
+    //   - id: string (required)
+    //   - uid: string (required)
+    //   - type: string (enum: ["buy", "sell"])
+    //   - crop: string (required)
+    //   - quantity: number (required)
+    //   - unit: string (required)
+    //   - price: number (required)
+    //   - status: string (enum: ["active", "matched", "completed"])
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: chats
+    // Document ID: {chatId}
+    // Fields:
+    //   - id: string (required)
+    //   - listingId: string (required)
+    //   - buyerUid: string (required)
+    //   - sellerUid: string (required)
+    //   - lastMessage: string (optional)
+    //   - updatedAt: timestamp (required)
+    //
+    // Collection: chats/{chatId}/messages
+    // Document ID: {messageId}
+    // Fields:
+    //   - id: string (required)
+    //   - chatId: string (required)
+    //   - senderUid: string (required)
+    //   - text: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: notifications
+    // Document ID: {notificationId}
+    // Fields:
+    //   - id: string (required)
+    //   - uid: string (required)
+    //   - text: string (required)
+    //   - read: bool (required)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "jimmy.mulundi@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Domain Validators
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'phoneNumber', 'displayName', 'createdAt', 'role']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.phoneNumber is string && data.phoneNumber.size() > 0 &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidListing(data) {
+      return hasOnlyAllowedFields(['id', 'uid', 'type', 'crop', 'quantity', 'unit', 'price', 'status', 'createdAt']) &&
+             data.id is string && data.id.size() > 0 &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.type in ['buy', 'sell'] &&
+             data.crop is string && data.crop.size() > 0 && data.crop.size() < 100 &&
+             data.quantity is number && data.quantity > 0 &&
+             data.unit is string && data.unit.size() > 0 && data.unit.size() < 50 &&
+             data.price is number && data.price > 0 &&
+             data.status in ['active', 'matched', 'completed'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidChat(data) {
+      return hasOnlyAllowedFields(['id', 'listingId', 'buyerUid', 'sellerUid', 'lastMessage', 'updatedAt']) &&
+             data.listingId is string &&
+             data.buyerUid is string &&
+             data.sellerUid is string &&
+             (request.auth.uid == data.buyerUid || request.auth.uid == data.sellerUid) &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidMessage(data) {
+      return hasOnlyAllowedFields(['id', 'chatId', 'senderUid', 'text', 'createdAt']) &&
+             data.chatId is string &&
+             data.senderUid is string && data.senderUid == request.auth.uid &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 2000 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidNotification(data) {
+      return hasOnlyAllowedFields(['id', 'uid', 'text', 'read', 'createdAt']) &&
+             data.uid is string &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 500 &&
+             data.read is bool &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(uid) && isValidUser(request.resource.data) && (!('role' in request.resource.data) || request.resource.data.role == 'user');
+      allow update: if isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+    }
+
+    match /listings/{listingId} {
+      allow read: if true; // Publicly readable for marketplace
+      allow create: if isAuthenticated() && isValidListing(request.resource.data);
+      allow update: if isAuthenticated() && (isDocOwner() || isAdmin()) && isValidListing(request.resource.data);
+      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
+    }
+
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.buyerUid || request.auth.uid == resource.data.sellerUid || isAdmin());
+      allow create: if isAuthenticated() && isValidChat(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.buyerUid || request.auth.uid == resource.data.sellerUid || isAdmin()) && isValidChat(request.resource.data);
+    }
+
+    match /chats/{chatId}/messages/{messageId} {
+      allow read: if isAuthenticated() && (get(/databases/$(database)/documents/chats/$(chatId)).data.buyerUid == request.auth.uid || get(/databases/$(database)/documents/chats/$(chatId)).data.sellerUid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidMessage(request.resource.data) && (get(/databases/$(database)/documents/chats/$(chatId)).data.buyerUid == request.auth.uid || get(/databases/$(database)/documents/chats/$(chatId)).data.sellerUid == request.auth.uid);
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.uid || isAdmin());
+      allow create: if isAuthenticated(); // Allow users to trigger notifications for others (e.g. on match)
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.uid || isAdmin()) && isValidNotification(request.resource.data);
+    }
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the SokoSense platform.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user." },
+        "phoneNumber": { "type": "string", "description": "The user's phone number." },
+        "displayName": { "type": "string", "description": "The user's display name." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user was created." }
+      },
+      "required": ["uid", "phoneNumber"]
+    },
+    "Listing": {
+      "title": "Listing",
+      "description": "A buy or sell offer for a farm product.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique identifier for the listing." },
+        "uid": { "type": "string", "description": "The UID of the user who created the listing." },
+        "type": { "type": "string", "enum": ["buy", "sell"], "description": "Whether the user is buying or selling." },
+        "crop": { "type": "string", "description": "The name of the crop (e.g., tomatoes)." },
+        "quantity": { "type": "number", "description": "The quantity of the crop." },
+        "unit": { "type": "string", "description": "The unit of measurement (e.g., gunia)." },
+        "price": { "type": "number", "description": "The price per unit." },
+        "status": { "type": "string", "enum": ["active", "matched", "completed"], "description": "The current status of the listing." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the listing was created." }
+      },
+      "required": ["uid", "type", "crop", "quantity", "unit", "price", "status", "createdAt"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "A negotiation chat between a buyer and a seller.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique identifier for the chat." },
+        "listingId": { "type": "string", "description": "The ID of the listing this chat is about." },
+        "buyerUid": { "type": "string", "description": "The UID of the buyer." },
+        "sellerUid": { "type": "string", "description": "The UID of the seller." },
+        "lastMessage": { "type": "string", "description": "The content of the last message." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the chat was last updated." }
+      },
+      "required": ["listingId", "buyerUid", "sellerUid", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A single message within a chat.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique identifier for the message." },
+        "chatId": { "type": "string", "description": "The ID of the chat this message belongs to." },
+        "senderUid": { "type": "string", "description": "The UID of the sender." },
+        "text": { "type": "string", "description": "The content of the message." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the message was sent." }
+      },
+      "required": ["chatId", "senderUid", "text", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A notification for a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique identifier for the notification." },
+        "uid": { "type": "string", "description": "The UID of the user to notify." },
+        "text": { "type": "string", "description": "The notification message." },
+        "read": { "type": "boolean", "description": "Whether the notification has been read." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the notification was created." }
+      },
+      "required": ["uid", "text", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles." },
+    "/listings/{listingId}": { "schema": "Listing", "description": "Buy and sell listings." },
+    "/chats/{chatId}": { "schema": "Chat", "description": "Negotiation chats." },
+    "/chats/{chatId}/messages/{messageId}": { "schema": "Message", "description": "Messages within a chat." },
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "User notifications." }
+  }
+}
