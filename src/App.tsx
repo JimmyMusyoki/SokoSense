@@ -10,6 +10,7 @@ import { Login } from "./components/Login";
 import { Marketplace } from "./components/Marketplace";
 import { ChatBox } from "./components/ChatBox";
 import { Notifications } from "./components/Notifications";
+import KilimoStats from "./components/KilimoStats";
 import { auth } from "./firebase";
 import { signOut } from "firebase/auth";
 import { CROPS } from "./constants";
@@ -85,7 +86,7 @@ export default function App() {
   );
 }
 
-type View = "ai" | "market" | "chat" | "notifications" | "login";
+type View = "ai" | "market" | "chat" | "notifications" | "login" | "stats";
 
 function AppContent() {
   const { user, profile, loading } = useAuth();
@@ -119,17 +120,19 @@ function AppContent() {
   const renderView = () => {
     switch (activeView) {
       case "ai":
-        return <MainApp />;
+        return <MainApp setActiveView={setActiveView} />;
       case "market":
         return user ? <Marketplace /> : <Login />;
       case "chat":
         return user ? <ChatBox initialChatId={selectedChatId} /> : <Login />;
       case "notifications":
         return user ? <Notifications /> : <Login />;
+      case "stats":
+        return <KilimoStats />;
       case "login":
         return <Login />;
       default:
-        return <MainApp />;
+        return <MainApp setActiveView={setActiveView} />;
     }
   };
 
@@ -150,10 +153,11 @@ function AppContent() {
           {user ? (
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
-                <p className="text-xs font-bold text-gray-800">{profile?.phoneNumber || user.email}</p>
+                <p className="text-xs font-bold text-gray-800">{profile?.displayName || 'Farmer'}</p>
+                <p className="text-[10px] text-gray-500 font-medium">{profile?.phoneNumber || user.email}</p>
                 <button 
                   onClick={() => signOut(auth)}
-                  className="text-[10px] text-red-500 font-bold uppercase hover:underline"
+                  className="text-[10px] text-red-500 font-bold uppercase hover:underline mt-1 block w-full"
                 >
                   Logout
                 </button>
@@ -193,6 +197,12 @@ function AppContent() {
           label="Market" 
         />
         <NavButton 
+          active={activeView === "stats"} 
+          onClick={() => setActiveView("stats")} 
+          icon={<TrendingUp className="w-5 h-5" />} 
+          label="Stats" 
+        />
+        <NavButton 
           active={activeView === "chat"} 
           onClick={() => setActiveView("chat")} 
           icon={<MessageSquare className="w-5 h-5" />} 
@@ -214,7 +224,7 @@ function AppContent() {
   );
 }
 
-function MainApp() {
+function MainApp({ setActiveView }: { setActiveView: (view: View) => void }) {
   console.log("MainApp rendering...");
   console.log("API Key present:", !!process.env.GEMINI_API_KEY);
 
@@ -370,6 +380,14 @@ function MainApp() {
                       </div>
                       <ChevronRight className="w-4 h-4 text-gray-300" />
                     </div>
+                    
+                    <button
+                      onClick={() => setActiveView("stats")}
+                      className="mt-4 w-full py-2 bg-green-50 text-green-700 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-green-100 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <TrendingUp className="w-3 h-3" />
+                      View Market Trends & Stats
+                    </button>
                   </div>
                 </motion.div>
               )}

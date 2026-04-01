@@ -1,6 +1,19 @@
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, addDoc, query, where, getDocs, serverTimestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, serverTimestamp, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 import { Listing, Notification } from '../types';
+
+export const updateListing = async (id: string, data: Partial<Listing>) => {
+  try {
+    const docRef = doc(db, 'listings', id);
+    await updateDoc(docRef, {
+      ...data,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `listings/${id}`);
+    throw error;
+  }
+};
 
 export const createListing = async (listing: Omit<Listing, 'id'>) => {
   try {

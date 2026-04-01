@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { Chat, ChatMessage, Listing } from '../types';
+import { Chat, ChatMessage, Listing, UserProfile } from '../types';
 import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck, Plus, Tag, ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
@@ -16,7 +16,34 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [activeListing, setActiveListing] = useState<Listing | null>(null);
+  const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chats.length === 0) return;
+
+    const fetchProfiles = async () => {
+      const uidsToFetch = Array.from(new Set(chats.flatMap(c => [c.buyerUid, c.sellerUid])));
+      const newUids = uidsToFetch.filter(uid => !userProfiles[uid]);
+
+      if (newUids.length === 0) return;
+
+      const profiles: Record<string, UserProfile> = { ...userProfiles };
+      for (const uid of newUids) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', uid));
+          if (userDoc.exists()) {
+            profiles[uid] = { uid, ...userDoc.data() } as UserProfile;
+          }
+        } catch (err) {
+          console.error(`Error fetching profile for ${uid}:`, err);
+        }
+      }
+      setUserProfiles(profiles);
+    };
+
+    fetchProfiles();
+  }, [chats]);
 
   useEffect(() => {
     if (!user) return;
@@ -186,7 +213,7 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline">
                     <h3 className="font-bold text-gray-800 text-sm truncate">
-                      {getOtherUserUid(chat).slice(0, 8)}...
+                      {userProfiles[getOtherUserUid(chat)]?.displayName || `User ${getOtherUserUid(chat).slice(0, 8)}`}
                     </h3>
                     <span className="text-[10px] text-gray-400 uppercase font-bold">
                       {chat.updatedAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -217,10 +244,12 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-gray-800 text-sm truncate">
-                  {activeListing ? `${activeListing.crop} (${activeListing.quantity} ${activeListing.unit})` : `User ${getOtherUserUid(activeChat).slice(0, 8)}`}
+                  {activeListing ? `${activeListing.crop} (${activeListing.quantity} ${activeListing.unit})` : (userProfiles[getOtherUserUid(activeChat)]?.displayName || `User ${getOtherUserUid(activeChat).slice(0, 8)}`)}
                 </h3>
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">Negotiating</p>
+                  <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">
+                    {userProfiles[getOtherUserUid(activeChat)]?.displayName ? `Chatting with ${userProfiles[getOtherUserUid(activeChat)].displayName}` : 'Online'}
+                  </p>
                   {activeListing && (
                     <span className="text-[10px] text-gray-400 font-bold">
                       • Ksh {activeListing.price}/{activeListing.unit}
@@ -239,6 +268,11 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                     "flex flex-col max-w-[80%]",
                     isMe ? "ml-auto items-end" : "mr-auto items-start"
                   )}>
+                    {!isMe && (
+                      <span className="text-[9px] text-gray-400 font-bold uppercase mb-1 px-1">
+                        {userProfiles[msg.senderUid]?.displayName || 'Other'}
+                      </span>
+                    )}
                     <div className={cn(
                       "px-4 py-3 rounded-2xl text-sm shadow-sm",
                       isMe 

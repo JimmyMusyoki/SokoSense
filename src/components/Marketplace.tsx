@@ -3,11 +3,11 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, getDocs } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Listing, Chat } from '../types';
-import { Plus, Search, Tag, ShoppingCart, ArrowRightLeft, MessageSquare, Bell, User, LogOut, Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Plus, Search, Tag, ShoppingCart, ArrowRightLeft, MessageSquare, Bell, User, LogOut, Loader2, CheckCircle2, AlertCircle, X, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 
-import { createListing, getMarketMatches } from '../services/marketplaceService';
+import { createListing, getMarketMatches, updateListing } from '../services/marketplaceService';
 import { CROPS, UNITS } from '../constants';
 
 export const Marketplace: React.FC = () => {
@@ -15,6 +15,7 @@ export const Marketplace: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'my'>('all');
   const [matches, setMatches] = useState<Record<string, Listing[]>>({});
 
@@ -82,28 +83,46 @@ export const Marketplace: React.FC = () => {
     setSubmitting(true);
     setError(null);
     try {
-      console.log('Creating listing with user:', user.uid);
-      const newListingData: Omit<Listing, 'id'> = {
-        uid: user.uid,
-        type,
-        crop,
-        quantity: Number(quantity),
-        unit,
-        price: Number(price),
-        status: 'active',
-        createdAt: serverTimestamp(),
-      };
-      console.log('Listing data:', newListingData);
-      await createListing(newListingData);
+      if (editingListing) {
+        await updateListing(editingListing.id, {
+          crop,
+          quantity: Number(quantity),
+          unit,
+          price: Number(price),
+          type,
+        });
+      } else {
+        const newListingData: Omit<Listing, 'id'> = {
+          uid: user.uid,
+          type,
+          crop,
+          quantity: Number(quantity),
+          unit,
+          price: Number(price),
+          status: 'active',
+          createdAt: serverTimestamp(),
+        };
+        await createListing(newListingData);
+      }
       setShowForm(false);
+      setEditingListing(null);
       resetForm();
-      // Optional: Show success toast/message
     } catch (err: any) {
-      console.error('Error creating listing:', err);
-      setError(err.message || 'Failed to create listing. Please check your permissions.');
+      console.error('Error handling listing:', err);
+      setError(err.message || 'Failed to process listing. Please check your permissions.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditClick = (listing: Listing) => {
+    setEditingListing(listing);
+    setCrop(listing.crop);
+    setQuantity(listing.quantity.toString());
+    setUnit(listing.unit);
+    setPrice(listing.price.toString());
+    setType(listing.type);
+    setShowForm(true);
   };
 
   const resetForm = () => {
@@ -229,8 +248,8 @@ export const Marketplace: React.FC = () => {
               className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-800">Create Listing</h2>
-                <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600">
+                <h2 className="text-xl font-bold text-gray-800">{editingListing ? 'Update Listing' : 'Create Listing'}</h2>
+                <button onClick={() => { setShowForm(false); setEditingListing(null); resetForm(); }} className="text-gray-400 hover:text-gray-600">
                   <X className="w-6 h-6" />
                 </button>
               </div>
@@ -316,7 +335,7 @@ export const Marketplace: React.FC = () => {
                   disabled={submitting}
                   className="w-full py-4 bg-[#2E7D32] text-white rounded-2xl font-bold shadow-lg hover:bg-[#1B5E20] disabled:opacity-50 transition-all flex items-center justify-center gap-2 mt-4"
                 >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Post Listing'}
+                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingListing ? 'Update Listing' : 'Post Listing')}
                 </button>
               </form>
             </motion.div>
@@ -407,9 +426,18 @@ export const Marketplace: React.FC = () => {
                     Negotiate
                   </button>
                 ) : (
-                  <button className="flex-1 py-3 bg-gray-100 text-gray-400 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 cursor-default">
-                    Your Listing
-                  </button>
+                  <div className="flex gap-2 w-full">
+                    <button 
+                      onClick={() => handleEditClick(listing)}
+                      className="flex-1 py-3 bg-green-50 text-[#2E7D32] rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-100 transition-all"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit Listing
+                    </button>
+                    <div className="flex-1 py-3 bg-gray-100 text-gray-400 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 cursor-default">
+                      Your Listing
+                    </div>
+                  </div>
                 )}
               </div>
             </motion.div>

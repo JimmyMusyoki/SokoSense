@@ -109,7 +109,7 @@ service cloud.firestore {
     }
 
     function isValidListing(data) {
-      return hasOnlyAllowedFields(['uid', 'type', 'crop', 'quantity', 'unit', 'price', 'status', 'createdAt']) &&
+      return hasOnlyAllowedFields(['uid', 'type', 'crop', 'quantity', 'unit', 'price', 'status', 'createdAt', 'updatedAt']) &&
              data.uid is string && data.uid == request.auth.uid &&
              data.type in ['buy', 'sell'] &&
              data.crop is string && data.crop.size() > 0 && data.crop.size() < 100 &&
@@ -117,7 +117,8 @@ service cloud.firestore {
              data.unit is string && data.unit.size() > 0 && data.unit.size() < 50 &&
              data.price is number && data.price > 0 &&
              data.status in ['active', 'matched', 'completed'] &&
-             (data.createdAt is timestamp || data.createdAt == request.time);
+             (data.createdAt is timestamp || data.createdAt == request.time) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp || data.updatedAt == request.time));
     }
 
     function isValidChat(data) {
@@ -163,7 +164,7 @@ service cloud.firestore {
 
     match /listings/{listingId} {
       allow read: if true; // Publicly readable for marketplace
-      allow create: if isAuthenticated(); // More permissive for debugging
+      allow create: if isAuthenticated() && isValidListing(request.resource.data);
       allow update: if isAuthenticated() && (isDocOwner() || isAdmin()) && isValidListing(request.resource.data);
       allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
     }
