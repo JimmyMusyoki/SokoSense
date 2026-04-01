@@ -63,23 +63,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (userDoc.exists()) {
             setProfile(userDoc.data() as UserProfile);
           } else {
-            const newProfile: UserProfile = {
-              uid: user.uid,
-              phoneNumber: user.phoneNumber || '',
-              displayName: user.displayName || 'Farmer',
-              createdAt: serverTimestamp(),
-              role: 'user'
-            };
-            await setDoc(doc(db, 'users', user.uid), newProfile);
-            setProfile(newProfile);
+            // Profile might not exist yet if it's a new user
+            // We'll handle creation in the Login component during signup
           }
         } catch (err) {
           console.error('Error fetching profile:', err);
-          // If Firestore fails (e.g. rules), we still have the user
         }
       } else {
-        // Only clear if we're not in bypass mode (simple check: if user was set but auth says null)
-        // For simplicity, we'll just let the bypass stay until refresh
+        setUser(null);
+        setProfile(null);
       }
       setLoading(false);
       setIsAuthReady(true);

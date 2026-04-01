@@ -7,10 +7,20 @@
       "properties": {
         "uid": { "type": "string", "description": "The unique identifier for the user." },
         "phoneNumber": { "type": "string", "description": "The user's phone number." },
+        "email": { "type": "string", "description": "The user's email address." },
         "displayName": { "type": "string", "description": "The user's display name." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the user was created." }
       },
-      "required": ["uid", "phoneNumber"]
+      "required": ["uid", "phoneNumber", "email"]
+    },
+    "PhoneToEmail": {
+      "title": "Phone to Email Mapping",
+      "description": "A mapping from phone number to email address for login.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "The email associated with the phone number." }
+      },
+      "required": ["email"]
     },
     "Listing": {
       "title": "Listing",
@@ -72,6 +82,7 @@
   },
   "firestore": {
     "/users/{uid}": { "schema": "User", "description": "User profiles." },
+    "/phone_to_email/{phoneNumber}": { "schema": "PhoneToEmail", "description": "Phone to email mapping for login." },
     "/listings/{listingId}": { "schema": "Listing", "description": "Buy and sell listings." },
     "/chats/{chatId}": { "schema": "Chat", "description": "Negotiation chats." },
     "/chats/{chatId}/messages/{messageId}": { "schema": "Message", "description": "Messages within a chat." },

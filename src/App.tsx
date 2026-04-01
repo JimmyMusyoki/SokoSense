@@ -88,7 +88,7 @@ export default function App() {
 type View = "ai" | "market" | "chat" | "notifications" | "login";
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const [activeView, setActiveView] = useState<View>("ai");
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
 
@@ -143,7 +143,7 @@ function AppContent() {
           {user ? (
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
-                <p className="text-xs font-bold text-gray-800">{user.phoneNumber}</p>
+                <p className="text-xs font-bold text-gray-800">{profile?.phoneNumber || user.email}</p>
                 <button 
                   onClick={() => signOut(auth)}
                   className="text-[10px] text-red-500 font-bold uppercase hover:underline"

@@ -90,11 +90,17 @@ service cloud.firestore {
     // Domain Validators
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'phoneNumber', 'displayName', 'createdAt', 'role']) &&
+      return hasOnlyAllowedFields(['uid', 'phoneNumber', 'email', 'displayName', 'createdAt', 'role']) &&
              data.uid is string && data.uid.size() > 0 &&
              data.phoneNumber is string && data.phoneNumber.size() > 0 &&
+             data.email is string && isValidEmail(data.email) &&
              (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
              data.createdAt is timestamp;
+    }
+
+    function isValidPhoneMapping(data) {
+      return hasOnlyAllowedFields(['email']) &&
+             data.email is string && isValidEmail(data.email);
     }
 
     function isValidListing(data) {
@@ -143,6 +149,12 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isOwner(uid) && isValidUser(request.resource.data) && (!('role' in request.resource.data) || request.resource.data.role == 'user');
       allow update: if isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+    }
+
+    match /phone_to_email/{phoneNumber} {
+      allow read: if true; // Allow lookup during login
+      allow create: if isAuthenticated() && isValidPhoneMapping(request.resource.data);
+      allow update: if false; // Mapping should be immutable
     }
 
     match /listings/{listingId} {
