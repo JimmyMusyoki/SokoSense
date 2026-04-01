@@ -30,6 +30,7 @@ export const fetchKilimoData = async (indicatorId?: number, itemId?: number): Pr
   try {
     const response = await fetch(url);
     if (!response.ok) {
+      console.error(`Kilimo API error: ${response.status} ${response.statusText} for URL: ${url}`);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const data: KilimoResponse = await response.json();
@@ -43,6 +44,9 @@ export const fetchKilimoData = async (indicatorId?: number, itemId?: number): Pr
 export const fetchIndicators = async () => {
   try {
     const response = await fetch(`${BASE_URL}/indicators`);
+    if (!response.ok) {
+      console.error(`Kilimo Indicators error: ${response.status} for URL: ${BASE_URL}/indicators`);
+    }
     const data = await response.json();
     return data.results || [];
   } catch (error) {
@@ -54,6 +58,9 @@ export const fetchIndicators = async () => {
 export const fetchItems = async () => {
   try {
     const response = await fetch(`${BASE_URL}/items`);
+    if (!response.ok) {
+      console.error(`Kilimo Items error: ${response.status} for URL: ${BASE_URL}/items`);
+    }
     const data = await response.json();
     return data.results || [];
   } catch (error) {

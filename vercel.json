@@ -1,0 +1,13 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/kilimo/:path*",
+      "destination": "https://statistics.kilimo.go.ke/api/:path*/"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "cleanUrls": true
+}

@@ -14,13 +14,15 @@ async function startServer() {
   // KilimoSTAT Proxy
   app.get("/api/kilimo/*", async (req, res) => {
     let subPath = req.params[0];
+    
     // Ensure subPath ends with a slash if it doesn't have one, as the Kilimo API expects it
+    // But don't add it if it's just an empty string or already has one
     if (subPath && !subPath.endsWith('/')) {
       subPath += '/';
     }
     
     const query = new URLSearchParams(req.query as any).toString();
-    let baseUrl = process.env.KILIMO_API_BASE_URL || 'https://statistics.kilimo.go.ke/api';
+    let baseUrl = (process.env.KILIMO_API_BASE_URL || 'https://statistics.kilimo.go.ke/api').trim();
     
     // Safety check: if baseUrl is just a port or invalid, use the default
     if (!baseUrl.startsWith('http')) {
@@ -28,7 +30,12 @@ async function startServer() {
       baseUrl = 'https://statistics.kilimo.go.ke/api';
     }
     
-    const url = `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}${subPath}${query ? '?' + query : ''}`;
+    // Remove trailing slash from baseUrl to avoid double slashes
+    if (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.slice(0, -1);
+    }
+    
+    const url = `${baseUrl}/${subPath}${query ? '?' + query : ''}`;
     
     console.log(`Proxying request to: ${url}`);
     
