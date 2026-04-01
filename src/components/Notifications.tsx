@@ -3,14 +3,16 @@ import { db, auth } from '../firebase';
 import { collection, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Notification } from '../types';
-import { Bell, Check, Loader2, MessageSquare, Tag, ShoppingCart, ArrowRightLeft, X } from 'lucide-react';
+import { Bell, Check, Loader2, MessageSquare, Tag, ShoppingCart, ArrowRightLeft, X, UserPlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
+import { UserProfileView } from './UserProfileView';
 
 export const Notifications: React.FC = () => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -39,11 +41,13 @@ export const Notifications: React.FC = () => {
     }
   };
 
-  const getIcon = (text: string) => {
-    if (text.toLowerCase().includes('match')) return <ArrowRightLeft className="w-5 h-5 text-amber-500" />;
-    if (text.toLowerCase().includes('message')) return <MessageSquare className="w-5 h-5 text-blue-500" />;
-    if (text.toLowerCase().includes('sell')) return <Tag className="w-5 h-5 text-green-500" />;
-    if (text.toLowerCase().includes('buy')) return <ShoppingCart className="w-5 h-5 text-purple-500" />;
+  const getIcon = (n: Notification) => {
+    if (n.type === 'follow') return <UserPlus className="w-5 h-5 text-indigo-500" />;
+    const text = n.text.toLowerCase();
+    if (text.includes('match')) return <ArrowRightLeft className="w-5 h-5 text-amber-500" />;
+    if (text.includes('message')) return <MessageSquare className="w-5 h-5 text-blue-500" />;
+    if (text.includes('sell')) return <Tag className="w-5 h-5 text-green-500" />;
+    if (text.includes('buy')) return <ShoppingCart className="w-5 h-5 text-purple-500" />;
     return <Bell className="w-5 h-5 text-gray-400" />;
   };
 
@@ -84,9 +88,19 @@ export const Notifications: React.FC = () => {
               )}
             >
               <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center shrink-0">
-                {getIcon(n.text)}
+                {getIcon(n)}
               </div>
-              <div className="flex-1">
+              <div 
+                className="flex-1 cursor-pointer"
+                onClick={() => {
+                  if (n.type === 'follow' && n.sourceUid) {
+                    setViewingProfileUid(n.sourceUid);
+                  } else if (n.type === 'listing') {
+                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'market' }));
+                  }
+                  markAsRead(n.id);
+                }}
+              >
                 <p className={cn("text-sm text-gray-800", !n.read ? "font-bold" : "font-medium")}>
                   {n.text}
                 </p>
@@ -105,6 +119,18 @@ export const Notifications: React.FC = () => {
               )}
             </motion.div>
           ))
+        )}
+      </AnimatePresence>
+
+      {/* User Profile Modal */}
+      <AnimatePresence>
+        {viewingProfileUid && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <UserProfileView 
+              uid={viewingProfileUid} 
+              onClose={() => setViewingProfileUid(null)} 
+            />
+          </div>
         )}
       </AnimatePresence>
     </div>

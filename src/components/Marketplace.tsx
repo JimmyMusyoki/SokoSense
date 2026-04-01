@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, getDocs, getDoc, doc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { Listing, Chat } from '../types';
+import { Listing, Chat, UserProfile } from '../types';
 import { Plus, Search, Tag, ShoppingCart, ArrowRightLeft, MessageSquare, Bell, User, LogOut, Loader2, CheckCircle2, AlertCircle, X, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
+import { UserProfileView } from './UserProfileView';
 
 import { createListing, getMarketMatches, updateListing } from '../services/marketplaceService';
 import { CROPS, UNITS } from '../constants';
@@ -29,6 +30,8 @@ export const Marketplace: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
+  const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
+  const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
 
   useEffect(() => {
     let q = query(
@@ -53,12 +56,35 @@ export const Marketplace: React.FC = () => {
       setListings(newListings);
       setLoading(false);
       
+      // Fetch profiles for these listings
+      fetchProfiles(newListings);
+
       // Find matches for each listing
       findMatches(newListings);
     });
 
     return () => unsubscribe();
   }, [selectedCrop]);
+
+  const fetchProfiles = async (allListings: Listing[]) => {
+    const uidsToFetch = Array.from(new Set(allListings.map(l => l.uid)));
+    const newUids = uidsToFetch.filter(uid => !userProfiles[uid]);
+    
+    if (newUids.length === 0) return;
+
+    const profiles: Record<string, UserProfile> = { ...userProfiles };
+    for (const uid of newUids) {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', uid));
+        if (userDoc.exists()) {
+          profiles[uid] = { uid, ...userDoc.data() } as UserProfile;
+        }
+      } catch (err) {
+        console.error(`Error fetching profile for ${uid}:`, err);
+      }
+    }
+    setUserProfiles(profiles);
+  };
 
   const findMatches = (allListings: Listing[]) => {
     const newMatches: Record<string, Listing[]> = {};
@@ -363,16 +389,30 @@ export const Marketplace: React.FC = () => {
             >
               <div className="flex justify-between items-start mb-4 gap-4">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
-                    listing.type === 'sell' ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"
-                  )}>
-                    {listing.type === 'sell' ? <Tag className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
+                  <div 
+                    onClick={() => setViewingProfileUid(listing.uid)}
+                    className="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border border-gray-100"
+                  >
+                    {userProfiles[listing.uid]?.photoURL ? (
+                      <img 
+                        src={userProfiles[listing.uid].photoURL} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className={cn(
+                        "w-full h-full flex items-center justify-center",
+                        listing.type === 'sell' ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"
+                      )}>
+                        {listing.type === 'sell' ? <Tag className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
+                      </div>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-bold text-gray-800 capitalize truncate">{listing.crop}</h3>
                     <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-                      {listing.type === 'sell' ? 'Selling' : 'Buying'}
+                      {userProfiles[listing.uid]?.displayName || (listing.type === 'sell' ? 'Seller' : 'Buyer')} • {listing.type === 'sell' ? 'Selling' : 'Buying'}
                     </p>
                   </div>
                 </div>
@@ -444,6 +484,18 @@ export const Marketplace: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* User Profile Modal */}
+      <AnimatePresence>
+        {viewingProfileUid && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <UserProfileView 
+              uid={viewingProfileUid} 
+              onClose={() => setViewingProfileUid(null)} 
+            />
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

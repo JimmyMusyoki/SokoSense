@@ -14,9 +14,22 @@
         "location": { "type": "string", "description": "The user's location." },
         "rating": { "type": "number", "description": "The user's rating based on successful deals." },
         "successfulDeals": { "type": "number", "description": "The number of successful deals completed by the user." },
+        "followersCount": { "type": "number", "description": "The number of followers the user has." },
+        "followingCount": { "type": "number", "description": "The number of users this user is following." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the user was created." }
       },
       "required": ["uid", "phoneNumber", "email"]
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "A follow relationship between two users.",
+      "type": "object",
+      "properties": {
+        "followerUid": { "type": "string", "description": "The UID of the user who is following." },
+        "followedUid": { "type": "string", "description": "The UID of the user being followed." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the follow relationship was created." }
+      },
+      "required": ["followerUid", "followedUid", "createdAt"]
     },
     "PhoneToEmail": {
       "title": "Phone to Email Mapping",
@@ -80,6 +93,9 @@
         "uid": { "type": "string", "description": "The UID of the user to notify." },
         "text": { "type": "string", "description": "The notification message." },
         "read": { "type": "boolean", "description": "Whether the notification has been read." },
+        "type": { "type": "string", "enum": ["listing", "chat", "follow"], "description": "The type of notification." },
+        "sourceUid": { "type": "string", "description": "The UID of the user who triggered the notification." },
+        "listingId": { "type": "string", "description": "The ID of the listing related to the notification." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the notification was created." }
       },
       "required": ["uid", "text", "read", "createdAt"]
@@ -91,6 +107,7 @@
     "/listings/{listingId}": { "schema": "Listing", "description": "Buy and sell listings." },
     "/chats/{chatId}": { "schema": "Chat", "description": "Negotiation chats." },
     "/chats/{chatId}/messages/{messageId}": { "schema": "Message", "description": "Messages within a chat." },
-    "/notifications/{notificationId}": { "schema": "Notification", "description": "User notifications." }
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "User notifications." },
+    "/follows/{followId}": { "schema": "Follow", "description": "Follow relationships." }
   }
 }

@@ -33,6 +33,8 @@ export interface UserProfile {
   location?: string;
   rating?: number;
   successfulDeals?: number;
+  followersCount?: number;
+  followingCount?: number;
   createdAt: any;
   role?: string;
 }
@@ -71,5 +73,14 @@ export interface Notification {
   uid: string;
   text: string;
   read: boolean;
+  createdAt: any;
+  type?: 'listing' | 'chat' | 'follow';
+  sourceUid?: string;
+  listingId?: string;
+}
+
+export interface Follow {
+  followerUid: string;
+  followedUid: string;
   createdAt: any;
 }

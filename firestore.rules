@@ -96,7 +96,7 @@ service cloud.firestore {
     // Domain Validators
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'phoneNumber', 'email', 'displayName', 'photoURL', 'about', 'location', 'rating', 'successfulDeals', 'createdAt', 'role']) &&
+      return hasOnlyAllowedFields(['uid', 'phoneNumber', 'email', 'displayName', 'photoURL', 'about', 'location', 'rating', 'successfulDeals', 'followersCount', 'followingCount', 'createdAt', 'role']) &&
              data.uid is string && data.uid.size() > 0 &&
              data.phoneNumber is string && data.phoneNumber.size() > 0 &&
              data.email is string && isValidEmail(data.email) &&
@@ -106,6 +106,8 @@ service cloud.firestore {
              (!('location' in data) || (data.location is string && data.location.size() < 200)) &&
              (!('rating' in data) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
              (!('successfulDeals' in data) || (data.successfulDeals is number && data.successfulDeals >= 0)) &&
+             (!('followersCount' in data) || (data.followersCount is number && data.followersCount >= 0)) &&
+             (!('followingCount' in data) || (data.followingCount is number && data.followingCount >= 0)) &&
              data.createdAt is timestamp;
     }
 
@@ -145,10 +147,20 @@ service cloud.firestore {
     }
 
     function isValidNotification(data) {
-      return hasOnlyAllowedFields(['uid', 'text', 'read', 'createdAt']) &&
+      return hasOnlyAllowedFields(['uid', 'text', 'read', 'type', 'sourceUid', 'listingId', 'createdAt']) &&
              data.uid is string &&
              data.text is string && data.text.size() > 0 && data.text.size() < 500 &&
              data.read is bool &&
+             (!('type' in data) || data.type in ['listing', 'chat', 'follow']) &&
+             (!('sourceUid' in data) || data.sourceUid is string) &&
+             (!('listingId' in data) || data.listingId is string) &&
+             (data.createdAt is timestamp || data.createdAt == request.time);
+    }
+
+    function isValidFollow(data) {
+      return hasOnlyAllowedFields(['followerUid', 'followedUid', 'createdAt']) &&
+             data.followerUid is string && data.followerUid == request.auth.uid &&
+             data.followedUid is string && data.followedUid != request.auth.uid &&
              (data.createdAt is timestamp || data.createdAt == request.time);
     }
 
@@ -190,6 +202,12 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (request.auth.uid == resource.data.uid || isAdmin());
       allow create: if isAuthenticated(); // Allow users to trigger notifications for others (e.g. on match)
       allow update: if isAuthenticated() && (request.auth.uid == resource.data.uid || isAdmin());
+    }
+
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidFollow(request.resource.data);
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.followerUid;
     }
   }
 }

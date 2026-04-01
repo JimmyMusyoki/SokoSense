@@ -24,6 +24,29 @@ export const createListing = async (listing: Omit<Listing, 'id'>) => {
     });
     console.log('marketplaceService: Listing created with ID:', docRef.id);
     
+    // Notify followers
+    try {
+      const followersQuery = query(
+        collection(db, 'follows'),
+        where('followedUid', '==', listing.uid)
+      );
+      const followersSnapshot = await getDocs(followersQuery);
+      for (const followerDoc of followersSnapshot.docs) {
+        const followerData = followerDoc.data();
+        await addDoc(collection(db, 'notifications'), {
+          uid: followerData.followerUid,
+          text: `${listing.type === 'sell' ? 'New produce available!' : 'New buy request!'} ${listing.crop} from a farmer you follow.`,
+          read: false,
+          type: 'listing',
+          sourceUid: listing.uid,
+          listingId: docRef.id,
+          createdAt: serverTimestamp(),
+        });
+      }
+    } catch (err) {
+      console.error('Error notifying followers:', err);
+    }
+
     // Check for matches and notify
     const matchType = listing.type === 'buy' ? 'sell' : 'buy';
     const q = query(

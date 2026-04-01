@@ -6,6 +6,7 @@ import { Chat, ChatMessage, Listing, UserProfile } from '../types';
 import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck, Plus, Tag, ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
+import { UserProfileView } from './UserProfileView';
 
 export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialChatId }) => {
   const { user } = useAuth();
@@ -17,6 +18,7 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
   const [sending, setSending] = useState(false);
   const [activeListing, setActiveListing] = useState<Listing | null>(null);
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
+  const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -207,8 +209,23 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                   activeChat?.id === chat.id ? "bg-green-50/50 border-l-4 border-l-[#2E7D32]" : ""
                 )}
               >
-                <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400">
-                  <User className="w-6 h-6" />
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewingProfileUid(getOtherUserUid(chat));
+                  }}
+                  className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400 overflow-hidden border border-gray-100 hover:opacity-80 transition-opacity cursor-pointer"
+                >
+                  {userProfiles[getOtherUserUid(chat)]?.photoURL ? (
+                    <img 
+                      src={userProfiles[getOtherUserUid(chat)].photoURL} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <User className="w-6 h-6" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline">
@@ -239,8 +256,20 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
               <button onClick={() => setActiveChat(null)} className="md:hidden text-gray-400">
                 <ArrowLeft className="w-6 h-6" />
               </button>
-              <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-[#2E7D32]">
-                {activeListing?.type === 'sell' ? <Tag className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
+              <div 
+                onClick={() => setViewingProfileUid(getOtherUserUid(activeChat))}
+                className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-[#2E7D32] overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {userProfiles[getOtherUserUid(activeChat)]?.photoURL ? (
+                  <img 
+                    src={userProfiles[getOtherUserUid(activeChat)].photoURL} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  activeListing?.type === 'sell' ? <Tag className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-gray-800 text-sm truncate">
@@ -263,29 +292,49 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {messages.map((msg, idx) => {
                 const isMe = msg.senderUid === user?.uid;
+                const senderProfile = userProfiles[msg.senderUid];
                 return (
                   <div key={msg.id} className={cn(
-                    "flex flex-col max-w-[80%]",
-                    isMe ? "ml-auto items-end" : "mr-auto items-start"
+                    "flex gap-3 max-w-[85%]",
+                    isMe ? "ml-auto flex-row-reverse" : "mr-auto"
                   )}>
                     {!isMe && (
-                      <span className="text-[9px] text-gray-400 font-bold uppercase mb-1 px-1">
-                        {userProfiles[msg.senderUid]?.displayName || 'Other'}
-                      </span>
+                      <div 
+                        onClick={() => setViewingProfileUid(msg.senderUid)}
+                        className="w-8 h-8 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity mt-1"
+                      >
+                        {senderProfile?.photoURL ? (
+                          <img src={senderProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <User className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
                     )}
                     <div className={cn(
-                      "px-4 py-3 rounded-2xl text-sm shadow-sm",
-                      isMe 
-                        ? "bg-[#2E7D32] text-white rounded-tr-none" 
-                        : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
+                      "flex flex-col",
+                      isMe ? "items-end" : "items-start"
                     )}>
-                      {msg.text}
-                    </div>
-                    <div className="flex items-center gap-1 mt-1 px-1">
-                      <span className="text-[9px] text-gray-400 font-bold uppercase">
-                        {msg.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      {isMe && <CheckCheck className="w-3 h-3 text-green-500" />}
+                      {!isMe && (
+                        <span className="text-[9px] text-gray-400 font-bold uppercase mb-1 px-1">
+                          {senderProfile?.displayName || 'Other'}
+                        </span>
+                      )}
+                      <div className={cn(
+                        "px-4 py-3 rounded-2xl text-sm shadow-sm",
+                        isMe 
+                          ? "bg-[#2E7D32] text-white rounded-tr-none" 
+                          : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
+                      )}>
+                        {msg.text}
+                      </div>
+                      <div className="flex items-center gap-1 mt-1 px-1">
+                        <span className="text-[9px] text-gray-400 font-bold uppercase">
+                          {msg.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {isMe && <CheckCheck className="w-3 h-3 text-green-500" />}
+                      </div>
                     </div>
                   </div>
                 );
@@ -325,6 +374,17 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
           </div>
         )}
       </div>
+      {/* User Profile Modal */}
+      <AnimatePresence>
+        {viewingProfileUid && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <UserProfileView 
+              uid={viewingProfileUid} 
+              onClose={() => setViewingProfileUid(null)} 
+            />
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
