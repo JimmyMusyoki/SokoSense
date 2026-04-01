@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously } from '../firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, handleFirestoreError, OperationType } from '../firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Mail, Phone, Lock, User as UserIcon, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -33,11 +33,16 @@ export const Login: React.FC = () => {
       // If identifier is a phone number (doesn't contain @)
       if (!identifier.includes('@')) {
         const cleanPhone = identifier.replace(/\s+/g, '');
-        const phoneDoc = await getDoc(doc(db, 'phone_to_email', cleanPhone));
-        if (!phoneDoc.exists()) {
-          throw new Error('No account found with this phone number.');
+        const path = `phone_to_email/${cleanPhone}`;
+        try {
+          const phoneDoc = await getDoc(doc(db, 'phone_to_email', cleanPhone));
+          if (!phoneDoc.exists()) {
+            throw new Error('No account found with this phone number.');
+          }
+          loginEmail = phoneDoc.data().email;
+        } catch (err) {
+          handleFirestoreError(err, OperationType.GET, path);
         }
-        loginEmail = phoneDoc.data().email;
       }
       
       await signInWithEmailAndPassword(auth, loginEmail, getPasswordFromPin(pin));
@@ -60,9 +65,14 @@ export const Login: React.FC = () => {
       const cleanPhone = phoneNumber.replace(/\s+/g, '');
       
       // 1. Check if phone already mapped
-      const phoneDoc = await getDoc(doc(db, 'phone_to_email', cleanPhone));
-      if (phoneDoc.exists()) {
-        throw new Error('This phone number is already registered.');
+      const phonePath = `phone_to_email/${cleanPhone}`;
+      try {
+        const phoneDoc = await getDoc(doc(db, 'phone_to_email', cleanPhone));
+        if (phoneDoc.exists()) {
+          throw new Error('This phone number is already registered.');
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.GET, phonePath);
       }
       
       // 2. Create Auth User
@@ -79,10 +89,19 @@ export const Login: React.FC = () => {
         role: 'user'
       };
       
-      await setDoc(doc(db, 'users', user.uid), profile);
+      const userPath = `users/${user.uid}`;
+      try {
+        await setDoc(doc(db, 'users', user.uid), profile);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, userPath);
+      }
       
       // 4. Create Phone Mapping
-      await setDoc(doc(db, 'phone_to_email', cleanPhone), { email });
+      try {
+        await setDoc(doc(db, 'phone_to_email', cleanPhone), { email });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, phonePath);
+      }
       
     } catch (err: any) {
       console.error('Signup error:', err);
