@@ -10,6 +10,7 @@ import { Login } from "./components/Login";
 import { Marketplace } from "./components/Marketplace";
 import { ChatBox } from "./components/ChatBox";
 import { Notifications } from "./components/Notifications";
+import { Profile } from "./components/Profile";
 import KilimoStats from "./components/KilimoStats";
 import { auth } from "./firebase";
 import { signOut } from "firebase/auth";
@@ -86,7 +87,7 @@ export default function App() {
   );
 }
 
-type View = "ai" | "market" | "chat" | "notifications" | "login" | "stats";
+type View = "ai" | "market" | "chat" | "notifications" | "login" | "stats" | "profile";
 
 function AppContent() {
   const { user, profile, loading } = useAuth();
@@ -127,6 +128,8 @@ function AppContent() {
         return user ? <ChatBox initialChatId={selectedChatId} /> : <Login />;
       case "notifications":
         return user ? <Notifications /> : <Login />;
+      case "profile":
+        return user ? <Profile onClose={() => setActiveView("ai")} /> : <Login />;
       case "stats":
         return <KilimoStats />;
       case "login":
@@ -162,8 +165,20 @@ function AppContent() {
                   Logout
                 </button>
               </div>
-              <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-[#2E7D32] border border-green-100">
-                <User className="w-5 h-5" />
+              <div 
+                onClick={() => setActiveView("profile")}
+                className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-[#2E7D32] border border-green-100 cursor-pointer overflow-hidden"
+              >
+                {profile?.photoURL ? (
+                  <img 
+                    src={profile.photoURL} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <User className="w-5 h-5" />
+                )}
               </div>
             </div>
           ) : (

@@ -9,6 +9,11 @@
         "phoneNumber": { "type": "string", "description": "The user's phone number." },
         "email": { "type": "string", "description": "The user's email address." },
         "displayName": { "type": "string", "description": "The user's display name." },
+        "photoURL": { "type": "string", "description": "The user's profile picture URL or base64 data." },
+        "about": { "type": "string", "description": "A description of what the user sells." },
+        "location": { "type": "string", "description": "The user's location." },
+        "rating": { "type": "number", "description": "The user's rating based on successful deals." },
+        "successfulDeals": { "type": "number", "description": "The number of successful deals completed by the user." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the user was created." }
       },
       "required": ["uid", "phoneNumber", "email"]

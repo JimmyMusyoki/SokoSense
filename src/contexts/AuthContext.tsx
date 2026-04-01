@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { UserProfile } from '../types';
 
 interface AuthContextType {
@@ -55,33 +55,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     window.addEventListener('auth:bypass', handleBypass);
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUser(user);
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            setProfile(userDoc.data() as UserProfile);
-          } else {
-            // Profile might not exist yet if it's a new user
-            // We'll handle creation in the Login component during signup
-          }
-        } catch (err) {
-          console.error('Error fetching profile:', err);
-        }
-      } else {
-        setUser(null);
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      if (!user) {
         setProfile(null);
+        setLoading(false);
+        setIsAuthReady(true);
       }
-      setLoading(false);
-      setIsAuthReady(true);
     });
 
     return () => {
-      unsubscribe();
+      unsubscribeAuth();
       window.removeEventListener('auth:bypass', handleBypass);
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribeProfile = onSnapshot(doc(db, 'users', user.uid), 
+      (doc) => {
+        if (doc.exists()) {
+          setProfile(doc.data() as UserProfile);
+        }
+        setLoading(false);
+        setIsAuthReady(true);
+      },
+      (err) => {
+        console.error('Error listening to profile:', err);
+        setLoading(false);
+        setIsAuthReady(true);
+      }
+    );
+
+    return () => unsubscribeProfile();
+  }, [user]);
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, isAuthReady }}>

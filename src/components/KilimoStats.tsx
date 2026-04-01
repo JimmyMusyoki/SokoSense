@@ -14,7 +14,8 @@ import {
 } from 'recharts';
 import { fetchKilimoData, fetchIndicators, fetchItems, KilimoData } from '../services/kilimoService';
 import { motion } from 'motion/react';
-import { TrendingUp, MapPin, Info, Loader2 } from 'lucide-react';
+import { TrendingUp, MapPin, Info, Loader2, RefreshCcw } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 const KilimoStats: React.FC = () => {
   const [data, setData] = useState<KilimoData[]>([]);
@@ -23,6 +24,17 @@ const KilimoStats: React.FC = () => {
   const [selectedIndicator, setSelectedIndicator] = useState<number>(2); // Production Quantity (Crops)
   const [selectedItem, setSelectedItem] = useState<number>(2); // Maize
   const [loading, setLoading] = useState<boolean>(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const loadData = async () => {
+    setLoading(true);
+    const results = await fetchKilimoData(selectedIndicator, selectedItem);
+    // Filter out 'KENYA' total to show county-level comparison
+    const filteredResults = (results || []).filter(d => d.area_name !== 'KENYA');
+    setData(filteredResults);
+    setLastUpdated(new Date());
+    setLoading(false);
+  };
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -36,16 +48,16 @@ const KilimoStats: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      const results = await fetchKilimoData(selectedIndicator, selectedItem);
-      // Filter out 'KENYA' total to show county-level comparison
-      const filteredResults = (results || []).filter(d => d.area_name !== 'KENYA');
-      setData(filteredResults);
-      setLoading(false);
-    };
     loadData();
+    
+    // Auto-refresh every 10 minutes
+    const interval = setInterval(loadData, 10 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [selectedIndicator, selectedItem]);
+
+  const handleRefresh = () => {
+    loadData();
+  };
 
   const currentIndicator = indicators.find(i => i.id === selectedIndicator);
   const currentItem = items.find(i => i.id === selectedItem);
@@ -58,10 +70,17 @@ const KilimoStats: React.FC = () => {
             <TrendingUp className="text-green-600" />
             Agricultural Market Insights
           </h1>
-          <p className="text-gray-500 text-sm">Real-time statistics from KilimoSTAT</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-gray-500 text-sm">Real-time statistics from KilimoSTAT</p>
+            {lastUpdated && (
+              <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500 uppercase">Crop / Item</label>
             <select
@@ -91,6 +110,15 @@ const KilimoStats: React.FC = () => {
               ))}
             </select>
           </div>
+
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-green-600 transition-colors disabled:opacity-50"
+            title="Refresh data"
+          >
+            <RefreshCcw className={cn("w-5 h-5", loading && "animate-spin")} />
+          </button>
         </div>
       </div>
 

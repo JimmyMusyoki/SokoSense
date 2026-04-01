@@ -28,6 +28,11 @@ export interface UserProfile {
   phoneNumber: string;
   email?: string;
   displayName?: string;
+  photoURL?: string;
+  about?: string;
+  location?: string;
+  rating?: number;
+  successfulDeals?: number;
   createdAt: any;
   role?: string;
 }
