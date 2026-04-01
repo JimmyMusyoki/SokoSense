@@ -12,6 +12,7 @@ import { ChatBox } from "./components/ChatBox";
 import { Notifications } from "./components/Notifications";
 import { auth } from "./firebase";
 import { signOut } from "firebase/auth";
+import { CROPS } from "./constants";
 
 interface Message {
   id: string;
@@ -219,6 +220,7 @@ function MainApp() {
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showAllCrops, setShowAllCrops] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -280,6 +282,10 @@ function MainApp() {
       setIsLoading(false);
     }
   };
+
+  // Get a subset of crops for quick tips
+  const featuredCrops = CROPS.slice(0, 6);
+  const otherCrops = CROPS.slice(6, 24); // Show some more but not all 127 at once
 
   return (
     <div className="max-w-4xl w-full mx-auto p-4 md:p-6 flex flex-col gap-6 h-full overflow-hidden">
@@ -372,6 +378,38 @@ function MainApp() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Produce Grid (The "Boxes") */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Market Produce</h3>
+          <button 
+            onClick={() => setShowAllCrops(!showAllCrops)}
+            className="text-xs font-bold text-[#2E7D32] hover:underline"
+          >
+            {showAllCrops ? "Show Less" : "View All"}
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {(showAllCrops ? [...featuredCrops, ...otherCrops] : featuredCrops).map((crop) => (
+            <motion.button
+              layout
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              key={crop}
+              onClick={() => setInput(`Niko na gunia 3 za ${crop.split(' (')[0].toLowerCase()} leo`)}
+              className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-[#2E7D32] hover:bg-green-50 transition-all group shadow-sm"
+            >
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Check Price</p>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-gray-700 text-sm truncate pr-2">{crop}</span>
+                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-[#2E7D32] transition-colors shrink-0" />
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
       {/* Input Area */}
       <div className="bg-white border border-gray-200 rounded-3xl p-2 shadow-xl shadow-gray-100 flex items-center gap-2">
         <button className="w-12 h-12 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-50 hover:text-[#2E7D32] transition-colors">
@@ -397,23 +435,6 @@ function MainApp() {
         >
           <Send className="w-5 h-5" />
         </button>
-      </div>
-
-      {/* Quick Tips */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {["Nyanya", "Viazi", "Mahindi"].map((crop) => (
-          <button
-            key={crop}
-            onClick={() => setInput(`Niko na gunia 3 za ${crop.toLowerCase()} leo`)}
-            className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-[#2E7D32] hover:bg-green-50 transition-all group"
-          >
-            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Check Price</p>
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-gray-700">{crop}</span>
-              <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-[#2E7D32] transition-colors" />
-            </div>
-          </button>
-        ))}
       </div>
     </div>
   );

@@ -26,13 +26,25 @@ export const Marketplace: React.FC = () => {
   const [price, setPrice] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
+
   useEffect(() => {
-    const q = query(
+    let q = query(
       collection(db, 'listings'),
       where('status', '==', 'active'),
       orderBy('createdAt', 'desc'),
       limit(50)
     );
+
+    if (selectedCrop) {
+      q = query(
+        collection(db, 'listings'),
+        where('status', '==', 'active'),
+        where('crop', '==', selectedCrop),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      );
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const newListings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Listing));
@@ -44,7 +56,7 @@ export const Marketplace: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [selectedCrop]);
 
   const findMatches = (allListings: Listing[]) => {
     const newMatches: Record<string, Listing[]> = {};
@@ -145,6 +157,37 @@ export const Marketplace: React.FC = () => {
           <Plus className="w-5 h-5" />
           <span className="hidden sm:inline font-bold">New Listing</span>
         </button>
+      </div>
+
+      {/* Categories / Produce Boxes */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Browse by Produce</h3>
+          {selectedCrop && (
+            <button 
+              onClick={() => setSelectedCrop(null)}
+              className="text-xs font-bold text-red-500 hover:underline"
+            >
+              Clear Filter
+            </button>
+          )}
+        </div>
+        <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4">
+          {CROPS.slice(0, 15).map((c) => (
+            <button
+              key={c}
+              onClick={() => setSelectedCrop(selectedCrop === c ? null : c)}
+              className={cn(
+                "flex-shrink-0 px-5 py-3 rounded-2xl border transition-all text-sm font-bold",
+                selectedCrop === c 
+                  ? "bg-[#2E7D32] text-white border-transparent shadow-lg shadow-green-100" 
+                  : "bg-white text-gray-600 border-gray-100 hover:border-green-200 hover:bg-green-50"
+              )}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tabs */}
