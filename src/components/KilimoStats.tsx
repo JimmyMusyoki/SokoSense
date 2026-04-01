@@ -150,7 +150,7 @@ const KilimoStats: React.FC = () => {
                 Top Producing Areas
               </h3>
               <div className="space-y-4">
-                {data
+                {[...data]
                   .sort((a, b) => b.data_value - a.data_value)
                   .slice(0, 5)
                   .map((item, idx) => (
@@ -180,7 +180,7 @@ const KilimoStats: React.FC = () => {
                 Market Tip
               </h3>
               <p className="text-sm text-green-50">
-                Based on current yield data, areas like <strong>{data.sort((a, b) => b.data_value - a.data_value)[0]?.area_name}</strong> are showing high productivity. 
+                Based on current yield data, areas like <strong>{[...data].sort((a, b) => b.data_value - a.data_value)[0]?.area_name}</strong> are showing high productivity. 
                 Consider sourcing from these regions for better prices or selling in areas with lower production.
               </p>
             </motion.div>
