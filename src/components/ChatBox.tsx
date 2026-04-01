@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { Chat, ChatMessage } from '../types';
-import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck } from 'lucide-react';
+import { Chat, ChatMessage, Listing } from '../types';
+import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck, Plus, Tag, ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 
@@ -15,6 +15,7 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [activeListing, setActiveListing] = useState<Listing | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,14 +58,36 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
   }, [user]);
 
   useEffect(() => {
-    if (initialChatId && chats.length > 0) {
+    if (initialChatId) {
       const chat = chats.find(c => c.id === initialChatId);
-      if (chat) setActiveChat(chat);
+      if (chat) {
+        setActiveChat(chat);
+      } else {
+        // If not in list, fetch it directly
+        const fetchChat = async () => {
+          const chatDoc = await getDoc(doc(db, 'chats', initialChatId));
+          if (chatDoc.exists()) {
+            setActiveChat({ id: chatDoc.id, ...chatDoc.data() } as Chat);
+          }
+        };
+        fetchChat();
+      }
     }
   }, [initialChatId, chats]);
 
   useEffect(() => {
-    if (!activeChat) return;
+    if (!activeChat) {
+      setActiveListing(null);
+      return;
+    }
+
+    const fetchListing = async () => {
+      const listingDoc = await getDoc(doc(db, 'listings', activeChat.listingId));
+      if (listingDoc.exists()) {
+        setActiveListing({ id: listingDoc.id, ...listingDoc.data() } as Listing);
+      }
+    };
+    fetchListing();
 
     const q = query(
       collection(db, 'chats', activeChat.id, 'messages'),
@@ -131,8 +154,15 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
         "w-full md:w-80 border-r border-gray-100 flex flex-col",
         activeChat ? "hidden md:flex" : "flex"
       )}>
-        <div className="p-6 border-b border-gray-100">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-800">Negotiations</h2>
+          <button 
+            onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'market' }))}
+            className="p-2 bg-green-50 text-[#2E7D32] rounded-xl hover:bg-green-100 transition-all"
+            title="Start New Negotiation"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto">
           {chats.length === 0 ? (
@@ -183,13 +213,20 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                 <ArrowLeft className="w-6 h-6" />
               </button>
               <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-[#2E7D32]">
-                <User className="w-5 h-5" />
+                {activeListing?.type === 'sell' ? <Tag className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
               </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-800 text-sm">
-                  User {getOtherUserUid(activeChat).slice(0, 8)}
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-gray-800 text-sm truncate">
+                  {activeListing ? `${activeListing.crop} (${activeListing.quantity} ${activeListing.unit})` : `User ${getOtherUserUid(activeChat).slice(0, 8)}`}
                 </h3>
-                <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">Online</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">Negotiating</p>
+                  {activeListing && (
+                    <span className="text-[10px] text-gray-400 font-bold">
+                      • Ksh {activeListing.price}/{activeListing.unit}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 

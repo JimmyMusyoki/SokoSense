@@ -97,8 +97,15 @@ function AppContent() {
       setSelectedChatId(e.detail);
       setActiveView("chat");
     };
+    const handleChangeView = (e: any) => {
+      setActiveView(e.detail);
+    };
     window.addEventListener('openChat', handleOpenChat);
-    return () => window.removeEventListener('openChat', handleOpenChat);
+    window.addEventListener('changeView', handleChangeView);
+    return () => {
+      window.removeEventListener('openChat', handleOpenChat);
+      window.removeEventListener('changeView', handleChangeView);
+    };
   }, []);
 
   if (loading) {

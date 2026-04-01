@@ -25,6 +25,7 @@ export const Marketplace: React.FC = () => {
   const [unit, setUnit] = useState(UNITS[0]);
   const [price, setPrice] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
 
@@ -79,7 +80,9 @@ export const Marketplace: React.FC = () => {
     if (!user || !crop || !quantity || !price) return;
 
     setSubmitting(true);
+    setError(null);
     try {
+      console.log('Creating listing with user:', user.uid);
       const newListingData: Omit<Listing, 'id'> = {
         uid: user.uid,
         type,
@@ -90,11 +93,14 @@ export const Marketplace: React.FC = () => {
         status: 'active',
         createdAt: serverTimestamp(),
       };
+      console.log('Listing data:', newListingData);
       await createListing(newListingData);
       setShowForm(false);
       resetForm();
-    } catch (err) {
+      // Optional: Show success toast/message
+    } catch (err: any) {
       console.error('Error creating listing:', err);
+      setError(err.message || 'Failed to create listing. Please check your permissions.');
     } finally {
       setSubmitting(false);
     }
@@ -230,6 +236,12 @@ export const Marketplace: React.FC = () => {
               </div>
               
               <form onSubmit={handleCreateListing} className="p-6 space-y-4">
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-600 text-sm">
+                    <AlertCircle className="w-5 h-5 shrink-0" />
+                    <p className="font-medium">{error}</p>
+                  </div>
+                )}
                 <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
                   <button
                     type="button"
@@ -330,22 +342,22 @@ export const Marketplace: React.FC = () => {
               key={listing.id}
               className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all group"
             >
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
+              <div className="flex justify-between items-start mb-4 gap-4">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center",
+                    "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
                     listing.type === 'sell' ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"
                   )}>
                     {listing.type === 'sell' ? <Tag className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800 capitalize">{listing.crop}</h3>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-gray-800 capitalize truncate">{listing.crop}</h3>
                     <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                       {listing.type === 'sell' ? 'Selling' : 'Buying'}
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-shrink-0">
                   <p className="text-lg font-black text-gray-900">Ksh {listing.price}</p>
                   <p className="text-xs text-gray-400 font-medium">per {listing.unit}</p>
                 </div>
