@@ -40,7 +40,8 @@ export const Login: React.FC = () => {
             throw new Error('No account found with this phone number.');
           }
           loginEmail = phoneDoc.data().email;
-        } catch (err) {
+        } catch (err: any) {
+          if (err.message === 'No account found with this phone number.') throw err;
           handleFirestoreError(err, OperationType.GET, path);
         }
       }
@@ -48,7 +49,11 @@ export const Login: React.FC = () => {
       await signInWithEmailAndPassword(auth, loginEmail, getPasswordFromPin(pin));
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err.message || 'Login failed. Please check your credentials.');
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('Email/Password authentication is not enabled in your Firebase project. Please go to the Firebase Console > Authentication > Sign-in method and enable "Email/Password".');
+      } else {
+        setError(err.message || 'Login failed. Please check your credentials.');
+      }
     } finally {
       setLoading(false);
     }
@@ -71,7 +76,8 @@ export const Login: React.FC = () => {
         if (phoneDoc.exists()) {
           throw new Error('This phone number is already registered.');
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err.message === 'This phone number is already registered.') throw err;
         handleFirestoreError(err, OperationType.GET, phonePath);
       }
       
@@ -105,7 +111,11 @@ export const Login: React.FC = () => {
       
     } catch (err: any) {
       console.error('Signup error:', err);
-      setError(err.message || 'Signup failed. Please try again.');
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('Email/Password authentication is not enabled in your Firebase project. Please go to the Firebase Console > Authentication > Sign-in method and enable "Email/Password".');
+      } else {
+        setError(err.message || 'Signup failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
