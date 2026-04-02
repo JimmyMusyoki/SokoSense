@@ -152,6 +152,18 @@ export const Profile: React.FC<ProfileProps> = ({ onClose }) => {
             </div>
           </div>
 
+          {/* Follower Stats */}
+          <div className="flex justify-center gap-8 py-2 border-b border-gray-50">
+            <div className="text-center">
+              <p className="text-lg font-bold text-gray-900">{profile?.followersCount || 0}</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Followers</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-bold text-gray-900">{profile?.followingCount || 0}</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Following</p>
+            </div>
+          </div>
+
           <div className="space-y-1">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone Number</label>
             <p className="px-4 py-3 bg-gray-50 rounded-2xl text-gray-500 font-medium border border-gray-100">

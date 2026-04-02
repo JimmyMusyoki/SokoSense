@@ -3,7 +3,7 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Chat, ChatMessage, Listing, UserProfile } from '../types';
-import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck, Plus, Tag, ShoppingCart } from 'lucide-react';
+import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck, Plus, Tag, ShoppingCart, Phone, MapPin, Navigation, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { UserProfileView } from './UserProfileView';
@@ -16,6 +16,7 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [sharingLocation, setSharingLocation] = useState(false);
   const [activeListing, setActiveListing] = useState<Listing | null>(null);
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
   const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
@@ -164,6 +165,45 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
     }
   };
 
+  const handleShareLocation = async () => {
+    if (!user || !activeChat || sharingLocation) return;
+
+    setSharingLocation(true);
+    try {
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+        const locationText = `📍 Shared Location: https://www.google.com/maps?q=${latitude},${longitude}`;
+
+        await addDoc(collection(db, 'chats', activeChat.id, 'messages'), {
+          chatId: activeChat.id,
+          senderUid: user.uid,
+          text: locationText,
+          type: 'location',
+          location: { latitude, longitude },
+          createdAt: serverTimestamp(),
+        });
+
+        await updateDoc(doc(db, 'chats', activeChat.id), {
+          lastMessage: '📍 Shared a location',
+          updatedAt: serverTimestamp(),
+        });
+        setSharingLocation(false);
+      }, (error) => {
+        console.error('Error getting location:', error);
+        alert("Failed to get your location. Please ensure you have granted permission.");
+        setSharingLocation(false);
+      });
+    } catch (err) {
+      console.error('Error sharing location:', err);
+      setSharingLocation(false);
+    }
+  };
+
   const getOtherUserUid = (chat: Chat) => {
     return chat.buyerUid === user?.uid ? chat.sellerUid : chat.buyerUid;
   };
@@ -286,6 +326,17 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                   )}
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+                {userProfiles[getOtherUserUid(activeChat)]?.phoneNumber && (
+                  <a 
+                    href={`tel:${userProfiles[getOtherUserUid(activeChat)].phoneNumber}`}
+                    className="p-2 bg-green-50 text-[#2E7D32] rounded-xl hover:bg-green-100 transition-all"
+                    title="Call Farmer"
+                  >
+                    <Phone className="w-5 h-5" />
+                  </a>
+                )}
+              </div>
             </div>
 
             {/* Messages */}
@@ -327,7 +378,38 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                           ? "bg-[#2E7D32] text-white rounded-tr-none" 
                           : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
                       )}>
-                        {msg.text}
+                        {msg.type === 'location' && msg.location ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 font-bold mb-1">
+                              <MapPin className="w-4 h-4" />
+                              <span>Current Location</span>
+                            </div>
+                            <div className="w-full h-32 bg-gray-100 rounded-xl overflow-hidden relative border border-gray-200/50">
+                              <img 
+                                src={`https://maps.googleapis.com/maps/api/staticmap?center=${msg.location.latitude},${msg.location.longitude}&zoom=15&size=300x150&markers=color:red%7C${msg.location.latitude},${msg.location.longitude}&key=${process.env.GOOGLE_MAPS_API_KEY || ''}`} 
+                                alt="Map"
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/5 opacity-0 hover:opacity-100 transition-opacity">
+                                <ExternalLink className="w-6 h-6 text-white drop-shadow-md" />
+                              </div>
+                            </div>
+                            <a 
+                              href={`https://www.google.com/maps?q=${msg.location.latitude},${msg.location.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={cn(
+                                "flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all",
+                                isMe ? "bg-white/20 text-white hover:bg-white/30" : "bg-green-50 text-[#2E7D32] hover:bg-green-100"
+                              )}
+                            >
+                              View on Google Maps
+                            </a>
+                          </div>
+                        ) : (
+                          msg.text
+                        )}
                       </div>
                       <div className="flex items-center gap-1 mt-1 px-1">
                         <span className="text-[9px] text-gray-400 font-bold uppercase">
@@ -345,6 +427,15 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
             {/* Input */}
             <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-gray-100">
               <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleShareLocation}
+                  disabled={sharingLocation}
+                  className="p-3 bg-gray-50 text-gray-500 rounded-2xl hover:bg-gray-100 transition-all disabled:opacity-50"
+                  title="Share Location"
+                >
+                  {sharingLocation ? <Loader2 className="w-5 h-5 animate-spin" /> : <Navigation className="w-5 h-5" />}
+                </button>
                 <input
                   type="text"
                   placeholder="Type your message..."
