@@ -92,7 +92,11 @@ export const Login: React.FC = () => {
         phoneNumber: cleanPhone,
         displayName: displayName || 'Farmer',
         createdAt: serverTimestamp(),
-        role: 'user'
+        role: 'user',
+        followersCount: 0,
+        followingCount: 0,
+        rating: 5.0,
+        successfulDeals: 0
       };
       
       const userPath = `users/${user.uid}`;

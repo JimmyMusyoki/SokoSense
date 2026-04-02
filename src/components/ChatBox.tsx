@@ -428,7 +428,7 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
               <div className="flex items-center gap-2">
                 {userProfiles[getOtherUserUid(activeChat)]?.phoneNumber && (
                   <a 
-                    href={`tel:${userProfiles[getOtherUserUid(activeChat)].phoneNumber}`}
+                    href={`tel:${userProfiles[getOtherUserUid(activeChat)].phoneNumber.replace(/\s+/g, '')}`}
                     className="p-2 bg-green-50 text-[#2E7D32] rounded-xl hover:bg-green-100 transition-all"
                     title="Call Farmer"
                   >
@@ -492,12 +492,19 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                               )}
                             </div>
                             <div className="w-full h-32 bg-gray-100 rounded-xl overflow-hidden relative border border-gray-200/50">
-                              <img 
-                                src={`https://maps.googleapis.com/maps/api/staticmap?center=${msg.location.latitude},${msg.location.longitude}&zoom=15&size=300x150&markers=color:red%7C${msg.location.latitude},${msg.location.longitude}&key=${process.env.GOOGLE_MAPS_API_KEY || ''}`} 
-                                alt="Map"
-                                className="w-full h-full object-cover"
-                                referrerPolicy="no-referrer"
-                              />
+                              {process.env.GOOGLE_MAPS_API_KEY ? (
+                                <img 
+                                  src={`https://maps.googleapis.com/maps/api/staticmap?center=${msg.location.latitude},${msg.location.longitude}&zoom=15&size=300x150&markers=color:red%7C${msg.location.latitude},${msg.location.longitude}&key=${process.env.GOOGLE_MAPS_API_KEY}`} 
+                                  alt="Map"
+                                  className="w-full h-full object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 gap-2">
+                                  <MapPin className="w-6 h-6" />
+                                  <span className="text-[10px] font-bold uppercase tracking-wider">Map Preview Unavailable</span>
+                                </div>
+                              )}
                               <div className="absolute inset-0 flex items-center justify-center bg-black/5 opacity-0 hover:opacity-100 transition-opacity">
                                 <ExternalLink className="w-6 h-6 text-white drop-shadow-md" />
                               </div>

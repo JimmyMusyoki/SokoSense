@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, deleteDoc, serverTimestamp, increment, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, deleteDoc, serverTimestamp, increment, updateDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { motion } from 'framer-motion';
-import { User, MapPin, Star, X, UserPlus, UserMinus, Loader2 } from 'lucide-react';
+import { User, MapPin, Star, X, UserPlus, UserMinus, Loader2, Phone } from 'lucide-react';
 import { UserProfile, Follow } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -61,37 +61,35 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ uid, onClose }
     if (!currentUser || followLoading) return;
     setFollowLoading(true);
     try {
+      const batch = writeBatch(db);
+      const followedRef = doc(db, 'users', uid);
+      const followerRef = doc(db, 'users', currentUser.uid);
+
       if (isFollowing && followDocId) {
         // Unfollow
-        await deleteDoc(doc(db, 'follows', followDocId));
+        batch.delete(doc(db, 'follows', followDocId));
+        batch.update(followedRef, { followersCount: increment(-1) });
+        batch.set(followerRef, { followingCount: increment(-1) }, { merge: true });
         
-        // Update counts (optimistic update would be better but let's keep it simple)
-        const followedRef = doc(db, 'users', uid);
-        const followerRef = doc(db, 'users', currentUser.uid);
-        
-        await updateDoc(followedRef, { followersCount: increment(-1) });
-        await updateDoc(followerRef, { followingCount: increment(-1) });
-        
+        await batch.commit();
         setIsFollowing(false);
         setFollowDocId(null);
       } else {
         // Follow
+        const followRef = doc(collection(db, 'follows'));
         const followData: Omit<Follow, 'id'> = {
           followerUid: currentUser.uid,
           followedUid: uid,
           createdAt: serverTimestamp()
         };
-        const docRef = await addDoc(collection(db, 'follows'), followData);
         
-        // Update counts
-        const followedRef = doc(db, 'users', uid);
-        const followerRef = doc(db, 'users', currentUser.uid);
-        
-        await updateDoc(followedRef, { followersCount: increment(1) });
-        await updateDoc(followerRef, { followingCount: increment(1) });
+        batch.set(followRef, followData);
+        batch.update(followedRef, { followersCount: increment(1) });
+        batch.set(followerRef, { followingCount: increment(1) }, { merge: true });
         
         // Notify the user
-        await addDoc(collection(db, 'notifications'), {
+        const notificationRef = doc(collection(db, 'notifications'));
+        batch.set(notificationRef, {
           uid: uid,
           text: `${currentUser.displayName || 'Someone'} followed you!`,
           read: false,
@@ -100,8 +98,9 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ uid, onClose }
           createdAt: serverTimestamp()
         });
 
+        await batch.commit();
         setIsFollowing(true);
-        setFollowDocId(docRef.id);
+        setFollowDocId(followRef.id);
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'follows');
@@ -196,30 +195,41 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ uid, onClose }
 
         {/* Follow Button */}
         {currentUser && currentUser.uid !== uid && (
-          <button
-            onClick={handleFollow}
-            disabled={followLoading}
-            className={cn(
-              "w-full py-3 rounded-2xl font-bold transition-all flex items-center justify-center gap-2",
-              isFollowing
-                ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                : "bg-[#2E7D32] text-white shadow-lg shadow-green-100 hover:bg-[#1B5E20]"
+          <div className="w-full flex gap-2">
+            {profile.phoneNumber && (
+              <a
+                href={`tel:${profile.phoneNumber.replace(/\s+/g, '')}`}
+                className="flex-1 py-3 bg-green-50 text-[#2E7D32] rounded-2xl font-bold transition-all flex items-center justify-center gap-2 hover:bg-green-100 border border-green-100"
+              >
+                <Phone className="w-5 h-5" />
+                Call
+              </a>
             )}
-          >
-            {followLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : isFollowing ? (
-              <>
-                <UserMinus className="w-5 h-5" />
-                Unfollow
-              </>
-            ) : (
-              <>
-                <UserPlus className="w-5 h-5" />
-                Follow
-              </>
-            )}
-          </button>
+            <button
+              onClick={handleFollow}
+              disabled={followLoading}
+              className={cn(
+                "flex-[2] py-3 rounded-2xl font-bold transition-all flex items-center justify-center gap-2",
+                isFollowing
+                  ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  : "bg-[#2E7D32] text-white shadow-lg shadow-green-100 hover:bg-[#1B5E20]"
+              )}
+            >
+              {followLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : isFollowing ? (
+                <>
+                  <UserMinus className="w-5 h-5" />
+                  Unfollow
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-5 h-5" />
+                  Follow
+                </>
+              )}
+            </button>
+          </div>
         )}
       </div>
     </motion.div>
