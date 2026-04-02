@@ -3,7 +3,7 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Chat, ChatMessage, Listing, UserProfile } from '../types';
-import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck, Plus, Tag, ShoppingCart, Phone, MapPin, Navigation, ExternalLink } from 'lucide-react';
+import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck, Plus, Tag, ShoppingCart, Phone, MapPin, Navigation, ExternalLink, MoreVertical, Timer, StopCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { UserProfileView } from './UserProfileView';
@@ -17,6 +17,8 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sharingLocation, setSharingLocation] = useState(false);
+  const [showLocationOptions, setShowLocationOptions] = useState(false);
+  const [liveLocationId, setLiveLocationId] = useState<string | null>(null);
   const [activeListing, setActiveListing] = useState<Listing | null>(null);
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
   const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
@@ -134,6 +136,52 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
     return () => unsubscribe();
   }, [activeChat]);
 
+  // Live Location Tracking
+  useEffect(() => {
+    if (!liveLocationId || !activeChat || !user) return;
+
+    let watchId: number;
+
+    const startWatching = () => {
+      if (!navigator.geolocation) return;
+
+      watchId = navigator.geolocation.watchPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          try {
+            const msgRef = doc(db, 'chats', activeChat.id, 'messages', liveLocationId);
+            const msgSnap = await getDoc(msgRef);
+            
+            if (msgSnap.exists()) {
+              const data = msgSnap.data() as ChatMessage;
+              // Check if expired
+              if (data.expiresAt && data.expiresAt.toDate() < new Date()) {
+                setLiveLocationId(null);
+                return;
+              }
+
+              await updateDoc(msgRef, {
+                location: { latitude, longitude }
+              });
+            } else {
+              setLiveLocationId(null);
+            }
+          } catch (err) {
+            console.error('Error updating live location:', err);
+          }
+        },
+        (err) => console.error('WatchPosition error:', err),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    };
+
+    startWatching();
+
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [liveLocationId, activeChat, user]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -169,15 +217,18 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
     if (!user || !activeChat || sharingLocation) return;
 
     setSharingLocation(true);
+    setShowLocationOptions(false);
+    
     try {
       if (!navigator.geolocation) {
-        alert("Geolocation is not supported by your browser");
+        console.error("Geolocation is not supported");
+        setSharingLocation(false);
         return;
       }
 
       navigator.geolocation.getCurrentPosition(async (position) => {
         const { latitude, longitude } = position.coords;
-        const locationText = `📍 Shared Location: https://www.google.com/maps?q=${latitude},${longitude}`;
+        const locationText = `📍 Current Location: https://www.google.com/maps?q=${latitude},${longitude}`;
 
         await addDoc(collection(db, 'chats', activeChat.id, 'messages'), {
           chatId: activeChat.id,
@@ -195,13 +246,61 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
         setSharingLocation(false);
       }, (error) => {
         console.error('Error getting location:', error);
-        alert("Failed to get your location. Please ensure you have granted permission.");
         setSharingLocation(false);
-      });
+      }, { enableHighAccuracy: true, timeout: 15000 });
     } catch (err) {
       console.error('Error sharing location:', err);
       setSharingLocation(false);
     }
+  };
+
+  const handleShareLiveLocation = async (durationMinutes: number) => {
+    if (!user || !activeChat || sharingLocation) return;
+
+    setSharingLocation(true);
+    setShowLocationOptions(false);
+
+    try {
+      if (!navigator.geolocation) {
+        console.error("Geolocation is not supported");
+        setSharingLocation(false);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+        const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
+        const locationText = `📡 Live Location (${durationMinutes}m): https://www.google.com/maps?q=${latitude},${longitude}`;
+
+        const docRef = await addDoc(collection(db, 'chats', activeChat.id, 'messages'), {
+          chatId: activeChat.id,
+          senderUid: user.uid,
+          text: locationText,
+          type: 'live_location',
+          location: { latitude, longitude },
+          expiresAt: expiresAt,
+          createdAt: serverTimestamp(),
+        });
+
+        await updateDoc(doc(db, 'chats', activeChat.id), {
+          lastMessage: '📡 Started sharing live location',
+          updatedAt: serverTimestamp(),
+        });
+
+        setLiveLocationId(docRef.id);
+        setSharingLocation(false);
+      }, (error) => {
+        console.error('Error getting location:', error);
+        setSharingLocation(false);
+      }, { enableHighAccuracy: true, timeout: 15000 });
+    } catch (err) {
+      console.error('Error sharing live location:', err);
+      setSharingLocation(false);
+    }
+  };
+
+  const stopLiveLocation = () => {
+    setLiveLocationId(null);
   };
 
   const getOtherUserUid = (chat: Chat) => {
@@ -378,11 +477,19 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                           ? "bg-[#2E7D32] text-white rounded-tr-none" 
                           : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
                       )}>
-                        {msg.type === 'location' && msg.location ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2 font-bold mb-1">
-                              <MapPin className="w-4 h-4" />
-                              <span>Current Location</span>
+                        {(msg.type === 'location' || msg.type === 'live_location') && msg.location ? (
+                          <div className="space-y-2 min-w-[200px]">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2 font-bold">
+                                {msg.type === 'live_location' ? <Navigation className="w-4 h-4 animate-pulse text-red-400" /> : <MapPin className="w-4 h-4" />}
+                                <span>{msg.type === 'live_location' ? 'Live Location' : 'Current Location'}</span>
+                              </div>
+                              {msg.type === 'live_location' && msg.expiresAt && (
+                                <span className="text-[10px] opacity-70 flex items-center gap-1">
+                                  <Timer className="w-3 h-3" />
+                                  {msg.expiresAt.toDate() < new Date() ? 'Expired' : 'Live'}
+                                </span>
+                              )}
                             </div>
                             <div className="w-full h-32 bg-gray-100 rounded-xl overflow-hidden relative border border-gray-200/50">
                               <img 
@@ -395,17 +502,28 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                                 <ExternalLink className="w-6 h-6 text-white drop-shadow-md" />
                               </div>
                             </div>
-                            <a 
-                              href={`https://www.google.com/maps?q=${msg.location.latitude},${msg.location.longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={cn(
-                                "flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all",
-                                isMe ? "bg-white/20 text-white hover:bg-white/30" : "bg-green-50 text-[#2E7D32] hover:bg-green-100"
+                            <div className="flex flex-col gap-2">
+                              <a 
+                                href={`https://www.google.com/maps?q=${msg.location.latitude},${msg.location.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={cn(
+                                  "flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all",
+                                  isMe ? "bg-white/20 text-white hover:bg-white/30" : "bg-green-50 text-[#2E7D32] hover:bg-green-100"
+                                )}
+                              >
+                                View on Google Maps
+                              </a>
+                              {isMe && msg.type === 'live_location' && liveLocationId === msg.id && (
+                                <button
+                                  onClick={stopLiveLocation}
+                                  className="flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold bg-red-50 text-red-600 hover:bg-red-100 transition-all"
+                                >
+                                  <StopCircle className="w-4 h-4" />
+                                  Stop Sharing
+                                </button>
                               )}
-                            >
-                              View on Google Maps
-                            </a>
+                            </div>
                           </div>
                         ) : (
                           msg.text
@@ -425,14 +543,51 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
             </div>
 
             {/* Input */}
-            <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-gray-100">
+            <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-gray-100 relative">
+              <AnimatePresence>
+                {showLocationOptions && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute bottom-full left-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 min-w-[200px] z-50"
+                  >
+                    <button
+                      type="button"
+                      onClick={handleShareLocation}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-all text-sm font-medium text-gray-700"
+                    >
+                      <MapPin className="w-4 h-4 text-blue-500" />
+                      Current Location
+                    </button>
+                    <div className="border-t border-gray-50 my-1 py-1">
+                      <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Live Location</p>
+                      {[15, 60, 480].map(mins => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => handleShareLiveLocation(mins)}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-all text-sm font-medium text-gray-700"
+                        >
+                          <Navigation className="w-4 h-4 text-red-500" />
+                          {mins === 15 ? '15 Minutes' : mins === 60 ? '1 Hour' : '8 Hours'}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={handleShareLocation}
+                  onClick={() => setShowLocationOptions(!showLocationOptions)}
                   disabled={sharingLocation}
-                  className="p-3 bg-gray-50 text-gray-500 rounded-2xl hover:bg-gray-100 transition-all disabled:opacity-50"
-                  title="Share Location"
+                  className={cn(
+                    "p-3 rounded-2xl transition-all disabled:opacity-50",
+                    showLocationOptions ? "bg-green-100 text-[#2E7D32]" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                  )}
+                  title="Location Options"
                 >
                   {sharingLocation ? <Loader2 className="w-5 h-5 animate-spin" /> : <Navigation className="w-5 h-5" />}
                 </button>

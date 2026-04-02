@@ -65,11 +65,12 @@ export interface ChatMessage {
   chatId: string;
   senderUid: string;
   text: string;
-  type?: 'text' | 'location';
+  type?: 'text' | 'location' | 'live_location';
   location?: {
     latitude: number;
     longitude: number;
   };
+  expiresAt?: any;
   createdAt: any;
 }
 

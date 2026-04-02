@@ -139,11 +139,14 @@ service cloud.firestore {
     }
 
     function isValidMessage(data) {
-      return hasOnlyAllowedFields(['chatId', 'senderUid', 'text', 'createdAt']) &&
+      return hasOnlyAllowedFields(['chatId', 'senderUid', 'text', 'createdAt', 'type', 'location', 'expiresAt']) &&
              data.chatId is string &&
              data.senderUid is string && data.senderUid == request.auth.uid &&
              data.text is string && data.text.size() > 0 && data.text.size() < 2000 &&
-             data.createdAt is timestamp;
+             data.createdAt is timestamp &&
+             (!('type' in data) || data.type in ['text', 'location', 'live_location']) &&
+             (!('location' in data) || (data.location is map && data.location.latitude is number && data.location.longitude is number)) &&
+             (!('expiresAt' in data) || (data.expiresAt is timestamp));
     }
 
     function isValidNotification(data) {
@@ -201,6 +204,7 @@ service cloud.firestore {
     match /chats/{chatId}/messages/{messageId} {
       allow read: if isAuthenticated() && (get(/databases/$(database)/documents/chats/$(chatId)).data.buyerUid == request.auth.uid || get(/databases/$(database)/documents/chats/$(chatId)).data.sellerUid == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && isValidMessage(request.resource.data) && (get(/databases/$(database)/documents/chats/$(chatId)).data.buyerUid == request.auth.uid || get(/databases/$(database)/documents/chats/$(chatId)).data.sellerUid == request.auth.uid);
+      allow update: if isAuthenticated() && resource.data.senderUid == request.auth.uid && isValidMessage(request.resource.data);
     }
 
     match /notifications/{notificationId} {
