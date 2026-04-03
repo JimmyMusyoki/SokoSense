@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc, getDoc, writeBatch, increment } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc, getDoc, getDocs, writeBatch, increment } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Chat, ChatMessage, Listing, UserProfile } from '../types';
 import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck, Plus, Tag, ShoppingCart, Phone, MapPin, Navigation, ExternalLink, MoreVertical, Timer, StopCircle, Image as ImageIcon, Camera, Star } from 'lucide-react';
@@ -27,6 +27,7 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
   const [ratingScore, setRatingScore] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
   const [isCompletingDeal, setIsCompletingDeal] = useState(false);
+  const [hasRated, setHasRated] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
@@ -206,6 +207,30 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
     };
   }, [liveLocationId, activeChat, user]);
 
+  // Check if user has already rated this deal
+  useEffect(() => {
+    if (!user || !activeChat || !activeListing || activeListing.status !== 'completed') {
+      setHasRated(false);
+      return;
+    }
+
+    const checkRating = async () => {
+      try {
+        const q = query(
+          collection(db, 'ratings'),
+          where('chatId', '==', activeChat.id),
+          where('fromUid', '==', user.uid)
+        );
+        const snap = await getDocs(q);
+        setHasRated(!snap.empty);
+      } catch (err) {
+        console.error('Error checking rating:', err);
+      }
+    };
+
+    checkRating();
+  }, [user, activeChat, activeListing]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -367,7 +392,8 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
 
       // Update user profile stats
       const targetUserRef = doc(db, 'users', targetUid);
-      const targetProfile = userProfiles[targetUid];
+      const targetProfileSnap = await getDoc(targetUserRef);
+      const targetProfile = targetProfileSnap.data();
       const currentRating = targetProfile?.rating || 5.0;
       const currentDeals = targetProfile?.successfulDeals || 0;
       
@@ -391,6 +417,7 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
       });
 
       await batch.commit();
+      setHasRated(true);
       setShowRatingModal(false);
     } catch (err) {
       console.error('Error submitting rating:', err);
@@ -619,6 +646,21 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                     {isCompletingDeal ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
                     Complete Deal
                   </button>
+                )}
+                {activeListing?.status === 'completed' && user.uid === activeChat.buyerUid && !hasRated && (
+                  <button
+                    onClick={() => setShowRatingModal(true)}
+                    className="flex items-center gap-2 px-3 py-2 bg-yellow-50 text-yellow-700 rounded-xl hover:bg-yellow-100 transition-all text-xs font-bold animate-pulse"
+                  >
+                    <Star className="w-4 h-4 fill-current" />
+                    Rate Seller
+                  </button>
+                )}
+                {activeListing?.status === 'completed' && hasRated && (
+                  <div className="flex items-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-xl text-[10px] font-bold uppercase tracking-wider">
+                    <Check className="w-3 h-3" />
+                    Deal Rated
+                  </div>
                 )}
                 {userProfiles[getOtherUserUid(activeChat)]?.phoneNumber && (
                   <a 
