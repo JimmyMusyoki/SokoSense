@@ -140,9 +140,9 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] flex flex-col font-sans text-[#1A1A1A] pb-24">
+    <div className="min-h-screen bg-[#F8F9FA] flex flex-col font-sans text-[#1A1A1A]">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-40 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#2E7D32] rounded-xl flex items-center justify-center shadow-lg shadow-green-100">
             <ShoppingBag className="text-white w-6 h-6" />
@@ -209,7 +209,7 @@ function AppContent() {
       </main>
 
       {/* Navigation Bar */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white/80 backdrop-blur-xl border border-gray-100 rounded-3xl shadow-2xl p-2 flex items-center justify-between z-50">
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white/95 backdrop-blur-xl border border-gray-100 rounded-3xl shadow-2xl p-2 flex items-center justify-between z-[100]">
         <NavButton 
           active={activeView === "ai"} 
           onClick={() => setActiveView("ai")} 
@@ -331,7 +331,7 @@ function MainApp({ setActiveView }: { setActiveView: (view: View) => void }) {
   const otherCrops = CROPS.slice(6, 24); // Show some more but not all 127 at once
 
   return (
-    <div className="max-w-4xl w-full mx-auto p-4 md:p-6 flex flex-col gap-6 h-full overflow-hidden">
+    <div className="max-w-4xl w-full mx-auto p-4 md:p-6 flex flex-col gap-6 h-full overflow-hidden pb-28">
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-thin scrollbar-thumb-gray-200">
         <AnimatePresence initial={false}>

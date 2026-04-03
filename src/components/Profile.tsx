@@ -92,7 +92,7 @@ export const Profile: React.FC<ProfileProps> = ({ onClose }) => {
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-white rounded-3xl p-6 shadow-xl max-w-md w-full mx-auto border border-gray-100 min-h-[500px] flex flex-col"
+      className="bg-white rounded-3xl p-6 shadow-xl max-w-md w-full mx-auto border border-gray-100 min-h-[500px] flex flex-col pb-28"
     >
       {view === 'edit' ? (
         <>

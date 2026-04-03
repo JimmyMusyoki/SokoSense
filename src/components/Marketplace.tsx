@@ -194,7 +194,7 @@ export const Marketplace: React.FC = () => {
     : listings.filter(l => l.uid === user?.uid);
 
   return (
-    <div className="max-w-4xl mx-auto p-4 space-y-6">
+    <div className="max-w-4xl mx-auto p-4 space-y-6 pb-28">
       {/* Header */}
       <div className="flex items-center justify-between bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
         <div>
@@ -382,7 +382,7 @@ export const Marketplace: React.FC = () => {
       {/* Listing Form Modal */}
       <AnimatePresence>
         {showForm && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -488,7 +488,7 @@ export const Marketplace: React.FC = () => {
       {/* User Profile Modal */}
       <AnimatePresence>
         {viewingProfileUid && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
             <UserProfileView 
               uid={viewingProfileUid} 
               onClose={() => setViewingProfileUid(null)} 

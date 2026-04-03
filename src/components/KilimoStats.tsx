@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import { fetchKilimoData, fetchIndicators, fetchItems, KilimoData } from '../services/kilimoService';
 import { motion } from 'motion/react';
-import { TrendingUp, MapPin, Info, Loader2, RefreshCcw } from 'lucide-react';
+import { TrendingUp, MapPin, Info, Loader2, RefreshCcw, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const KilimoStats: React.FC = () => {
@@ -24,16 +24,27 @@ const KilimoStats: React.FC = () => {
   const [selectedIndicator, setSelectedIndicator] = useState<number>(2); // Production Quantity (Crops)
   const [selectedItem, setSelectedItem] = useState<number>(2); // Maize
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const loadData = async () => {
     setLoading(true);
-    const results = await fetchKilimoData(selectedIndicator, selectedItem);
-    // Filter out 'KENYA' total to show county-level comparison
-    const filteredResults = (results || []).filter(d => d.area_name !== 'KENYA');
-    setData(filteredResults);
-    setLastUpdated(new Date());
-    setLoading(false);
+    setError(null);
+    try {
+      const results = await fetchKilimoData(selectedIndicator, selectedItem);
+      // Filter out 'KENYA' total to show county-level comparison
+      const filteredResults = (results || []).filter(d => d.area_name !== 'KENYA');
+      setData(filteredResults);
+      if (filteredResults.length === 0) {
+        setError("No data available for the selected indicator and crop.");
+      }
+      setLastUpdated(new Date());
+    } catch (err: any) {
+      console.error('Error loading Kilimo data:', err);
+      setError("Failed to load market data. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -63,7 +74,7 @@ const KilimoStats: React.FC = () => {
   const currentItem = items.find(i => i.id === selectedItem);
 
   return (
-    <div className="space-y-6 p-4 md:p-6 bg-gray-50 min-h-screen">
+    <div className="space-y-6 p-4 md:p-6 bg-gray-50 h-full overflow-y-auto pb-28">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -126,6 +137,17 @@ const KilimoStats: React.FC = () => {
         <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-gray-100 shadow-sm">
           <Loader2 className="w-8 h-8 text-green-600 animate-spin mb-2" />
           <p className="text-gray-500">Fetching latest market data...</p>
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-red-100 shadow-sm p-6 text-center">
+          <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
+          <p className="text-gray-800 font-medium">{error}</p>
+          <button 
+            onClick={handleRefresh}
+            className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-bold"
+          >
+            Try Again
+          </button>
         </div>
       ) : data.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

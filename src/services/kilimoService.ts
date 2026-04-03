@@ -29,11 +29,11 @@ export const fetchKilimoData = async (indicatorId?: number, itemId?: number): Pr
 
   try {
     const response = await fetch(url);
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      console.error(`Kilimo API error: ${response.status} ${response.statusText} for URL: ${url}`);
-      throw new Error(`HTTP error! status: ${response.status}`);
+      console.error(`Kilimo API error: ${response.status} ${response.statusText} for URL: ${url}`, data);
+      throw new Error(`HTTP error! status: ${response.status}${data.message ? ' - ' + data.message : ''}`);
     }
-    const data: KilimoResponse = await response.json();
     return data.results || [];
   } catch (error) {
     console.error('Error fetching Kilimo data:', error);
@@ -44,10 +44,11 @@ export const fetchKilimoData = async (indicatorId?: number, itemId?: number): Pr
 export const fetchIndicators = async () => {
   try {
     const response = await fetch(`${BASE_URL}/indicators`);
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      console.error(`Kilimo Indicators error: ${response.status} for URL: ${BASE_URL}/indicators`);
+      console.error(`Kilimo Indicators error: ${response.status} for URL: ${BASE_URL}/indicators`, data);
+      return [];
     }
-    const data = await response.json();
     return data.results || [];
   } catch (error) {
     console.error('Error fetching indicators:', error);
@@ -58,10 +59,11 @@ export const fetchIndicators = async () => {
 export const fetchItems = async () => {
   try {
     const response = await fetch(`${BASE_URL}/items`);
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      console.error(`Kilimo Items error: ${response.status} for URL: ${BASE_URL}/items`);
+      console.error(`Kilimo Items error: ${response.status} for URL: ${BASE_URL}/items`, data);
+      return [];
     }
-    const data = await response.json();
     return data.results || [];
   } catch (error) {
     console.error('Error fetching items:', error);

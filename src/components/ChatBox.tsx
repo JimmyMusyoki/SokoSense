@@ -500,7 +500,7 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
   }
 
   return (
-    <div className="max-w-4xl mx-auto h-[70vh] bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex">
+    <div className="max-w-4xl mx-auto h-full bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex pb-28">
       {/* Chat List */}
       <div className={cn(
         "w-full md:w-80 border-r border-gray-100 flex flex-col",
@@ -957,7 +957,7 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
       {/* User Profile Modal */}
       <AnimatePresence>
         {viewingProfileUid && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
             <UserProfileView 
               uid={viewingProfileUid} 
               onClose={() => setViewingProfileUid(null)} 

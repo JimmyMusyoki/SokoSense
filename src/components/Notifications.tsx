@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Notification } from '../types';
 import { Bell, Check, Loader2, MessageSquare, Tag, ShoppingCart, ArrowRightLeft, X, UserPlus, Star, CheckCheck } from 'lucide-react';
@@ -41,6 +41,21 @@ export const Notifications: React.FC = () => {
     }
   };
 
+  const markAllAsRead = async () => {
+    const unread = notifications.filter(n => !n.read);
+    if (unread.length === 0) return;
+
+    try {
+      const batch = writeBatch(db);
+      unread.forEach(n => {
+        batch.update(doc(db, 'notifications', n.id), { read: true });
+      });
+      await batch.commit();
+    } catch (err) {
+      console.error('Error marking all as read:', err);
+    }
+  };
+
   const getIcon = (n: Notification) => {
     if (n.type === 'follow') return <UserPlus className="w-5 h-5 text-indigo-500" />;
     if (n.type === 'rating') return <Star className="w-5 h-5 text-yellow-500 fill-current" />;
@@ -62,12 +77,22 @@ export const Notifications: React.FC = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-4">
+    <div className="max-w-2xl mx-auto p-4 space-y-4 pb-28">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Notifications</h2>
-        <span className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-bold">
-          {notifications.filter(n => !n.read).length} Unread
-        </span>
+        <div className="flex items-center gap-3">
+          {notifications.some(n => !n.read) && (
+            <button
+              onClick={markAllAsRead}
+              className="text-xs font-bold text-[#2E7D32] hover:underline"
+            >
+              Mark all as read
+            </button>
+          )}
+          <span className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-bold">
+            {notifications.filter(n => !n.read).length} Unread
+          </span>
+        </div>
       </div>
 
       <AnimatePresence>
