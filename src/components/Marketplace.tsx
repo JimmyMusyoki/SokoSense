@@ -40,6 +40,14 @@ export const Marketplace: React.FC = () => {
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
 
   useEffect(() => {
+    const handleViewProfile = (e: any) => {
+      setViewingProfileUid(e.detail);
+    };
+    window.addEventListener('viewProfile', handleViewProfile);
+    return () => window.removeEventListener('viewProfile', handleViewProfile);
+  }, []);
+
+  useEffect(() => {
     let q = query(
       collection(db, 'listings'),
       where('status', '==', 'active'),

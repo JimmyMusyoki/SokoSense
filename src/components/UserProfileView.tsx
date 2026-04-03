@@ -6,6 +6,7 @@ import { User, MapPin, Star, X, UserPlus, UserMinus, Loader2, Phone } from 'luci
 import { UserProfile, Follow } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+import { SuggestedFollows } from './SuggestedFollows';
 
 interface UserProfileViewProps {
   uid: string;
@@ -252,6 +253,8 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ uid, onClose }
             </button>
           </div>
         )}
+
+        <SuggestedFollows targetUid={uid} />
       </div>
     </motion.div>
   );

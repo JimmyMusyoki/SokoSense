@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -7,6 +7,8 @@ import { User, Camera, Loader2, Check, X, LogOut, MapPin, Info, Star, Users, Use
 import { signOut } from 'firebase/auth';
 import { cn } from '../lib/utils';
 import { FollowLists } from './FollowLists';
+import { UserProfileView } from './UserProfileView';
+import { SuggestedFollows } from './SuggestedFollows';
 
 interface ProfileProps {
   onClose: () => void;
@@ -21,6 +23,7 @@ export const Profile: React.FC<ProfileProps> = ({ onClose }) => {
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'edit' | 'followers' | 'following'>('edit');
+  const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync local state with profile if it updates in background
@@ -87,6 +90,25 @@ export const Profile: React.FC<ProfileProps> = ({ onClose }) => {
       setIsUpdating(false);
     }
   };
+
+  useEffect(() => {
+    const handleViewProfile = (e: any) => {
+      setViewingProfileUid(e.detail);
+    };
+    window.addEventListener('viewProfile', handleViewProfile);
+    return () => window.removeEventListener('viewProfile', handleViewProfile);
+  }, []);
+
+  if (viewingProfileUid) {
+    return (
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <UserProfileView 
+          uid={viewingProfileUid} 
+          onClose={() => setViewingProfileUid(null)} 
+        />
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -246,9 +268,10 @@ export const Profile: React.FC<ProfileProps> = ({ onClose }) => {
               </button>
 
               <div className="pt-4 border-t border-gray-100">
+                <SuggestedFollows />
                 <button
                   onClick={() => signOut(auth)}
-                  className="w-full py-3 text-red-500 font-bold flex items-center justify-center gap-2 hover:bg-red-50 rounded-2xl transition-all"
+                  className="w-full py-3 text-red-500 font-bold flex items-center justify-center gap-2 hover:bg-red-50 rounded-2xl transition-all mt-4"
                 >
                   <LogOut className="w-5 h-5" />
                   Logout
