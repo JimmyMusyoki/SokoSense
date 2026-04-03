@@ -3,7 +3,7 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, getDocs, getDoc, doc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Listing, Chat, UserProfile } from '../types';
-import { Plus, Search, Tag, ShoppingCart, ArrowRightLeft, MessageSquare, Bell, User, LogOut, Loader2, CheckCircle2, AlertCircle, X, Edit2 } from 'lucide-react';
+import { Plus, Search, Tag, ShoppingCart, ArrowRightLeft, MessageSquare, Bell, User, LogOut, Loader2, CheckCircle2, AlertCircle, X, Edit2, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { UserProfileView } from './UserProfileView';
@@ -32,6 +32,12 @@ export const Marketplace: React.FC = () => {
   const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
   const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [minPrice, setMinPrice] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<string>('');
+  const [minQuantity, setMinQuantity] = useState<string>('');
+  const [maxQuantity, setMaxQuantity] = useState<string>('');
+  const [selectedUnit, setSelectedUnit] = useState<string>('all');
 
   useEffect(() => {
     let q = query(
@@ -159,6 +165,15 @@ export const Marketplace: React.FC = () => {
     setUnit(UNITS[0]);
   };
 
+  const resetFilters = () => {
+    setSelectedCrop(null);
+    setMinPrice('');
+    setMaxPrice('');
+    setMinQuantity('');
+    setMaxQuantity('');
+    setSelectedUnit('all');
+  };
+
   const startChat = async (listing: Listing) => {
     if (!user) return;
     
@@ -189,9 +204,23 @@ export const Marketplace: React.FC = () => {
     window.dispatchEvent(new CustomEvent('openChat', { detail: docRef.id }));
   };
 
-  const filteredListings = activeTab === 'all' 
+  const filteredListings = (activeTab === 'all' 
     ? listings 
-    : listings.filter(l => l.uid === user?.uid);
+    : listings.filter(l => l.uid === user?.uid)
+  ).filter(l => {
+    // Price filter
+    if (minPrice && l.price < Number(minPrice)) return false;
+    if (maxPrice && l.price > Number(maxPrice)) return false;
+    
+    // Quantity filter
+    if (minQuantity && l.quantity < Number(minQuantity)) return false;
+    if (maxQuantity && l.quantity > Number(maxQuantity)) return false;
+    
+    // Unit filter
+    if (selectedUnit !== 'all' && l.unit !== selectedUnit) return false;
+    
+    return true;
+  });
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6 pb-28">
@@ -214,15 +243,112 @@ export const Marketplace: React.FC = () => {
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Browse by Produce</h3>
-          {selectedCrop && (
-            <button 
-              onClick={() => setSelectedCrop(null)}
-              className="text-xs font-bold text-red-500 hover:underline"
+          <div className="flex items-center gap-3">
+            {selectedCrop && (
+              <button 
+                onClick={() => setSelectedCrop(null)}
+                className="text-xs font-bold text-red-500 hover:underline"
+              >
+                Clear Crop
+              </button>
+            )}
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all",
+                showAdvancedFilters 
+                  ? "bg-green-50 text-[#2E7D32] border border-green-100" 
+                  : "text-gray-500 hover:bg-gray-50"
+              )}
             >
-              Clear Filter
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Filters
+              {showAdvancedFilters ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
-          )}
+          </div>
         </div>
+        
+        <AnimatePresence>
+          {showAdvancedFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm space-y-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Price Range */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Price Range (Ksh)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        placeholder="Min"
+                        value={minPrice}
+                        onChange={(e) => setMinPrice(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                      <span className="text-gray-300">-</span>
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quantity Range */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Quantity</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        placeholder="Min"
+                        value={minQuantity}
+                        onChange={(e) => setMinQuantity(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                      <span className="text-gray-300">-</span>
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        value={maxQuantity}
+                        onChange={(e) => setMaxQuantity(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Unit Filter */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unit</label>
+                    <select
+                      value={selectedUnit}
+                      onChange={(e) => setSelectedUnit(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                    >
+                      <option value="all">All Units</option>
+                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={resetFilters}
+                    className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    Reset All Filters
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4">
           {CROPS.slice(0, 15).map((c) => (
             <button
