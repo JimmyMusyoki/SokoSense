@@ -96,7 +96,7 @@ service cloud.firestore {
     // Domain Validators
 
     function isValidUser(data) {
-      return hasRequiredFields(['uid', 'createdAt']) &&
+      return hasRequiredFields(['uid']) &&
              data.uid is string && data.uid.size() > 0 &&
              (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() > 0)) &&
              (!('email' in data) || isValidEmail(data.email)) &&
@@ -106,9 +106,10 @@ service cloud.firestore {
              (!('location' in data) || (data.location is string && data.location.size() < 200)) &&
              (!('rating' in data) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
              (!('successfulDeals' in data) || (data.successfulDeals is number && data.successfulDeals >= 0)) &&
-             (!('followersCount' in data) || (data.followersCount is number && data.followersCount >= 0)) &&
-             (!('followingCount' in data) || (data.followingCount is number && data.followingCount >= 0)) &&
-             data.createdAt is timestamp;
+             (!('followersCount' in data) || (data.followersCount is number && data.followersCount >= -1000000)) &&
+             (!('followingCount' in data) || (data.followingCount is number && data.followingCount >= -1000000)) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
 
     function isValidPhoneMapping(data) {
@@ -117,8 +118,9 @@ service cloud.firestore {
     }
 
     function isValidListing(data) {
-      return hasOnlyAllowedFields(['uid', 'type', 'crop', 'quantity', 'unit', 'price', 'status', 'createdAt', 'updatedAt']) &&
-             data.uid is string && data.uid == request.auth.uid &&
+      return hasOnlyAllowedFields(['id', 'uid', 'type', 'crop', 'quantity', 'unit', 'price', 'status', 'createdAt', 'updatedAt']) &&
+             data.uid is string && 
+             (data.uid == request.auth.uid || (resource != null && data.uid == resource.data.uid) || isAdmin()) &&
              data.type in ['buy', 'sell'] &&
              data.crop is string && data.crop.size() > 0 && data.crop.size() < 100 &&
              data.quantity is number && data.quantity > 0 &&
@@ -139,31 +141,36 @@ service cloud.firestore {
     }
 
     function isValidMessage(data) {
-      return hasOnlyAllowedFields(['chatId', 'senderUid', 'text', 'createdAt', 'type', 'location', 'expiresAt']) &&
+      return hasOnlyAllowedFields(['id', 'chatId', 'senderUid', 'text', 'createdAt', 'type', 'location', 'expiresAt', 'imageURL']) &&
              data.chatId is string &&
-             data.senderUid is string && data.senderUid == request.auth.uid &&
-             data.text is string && data.text.size() > 0 && data.text.size() < 2000 &&
-             data.createdAt is timestamp &&
-             (!('type' in data) || data.type in ['text', 'location', 'live_location']) &&
+             (data.senderUid == request.auth.uid || data.senderUid == 'system' || isAdmin()) &&
+             data.text is string && data.text.size() < 2000 &&
+             (data.createdAt is timestamp || data.createdAt == request.time) &&
+             (!('type' in data) || data.type in ['text', 'location', 'live_location', 'image', 'system']) &&
              (!('location' in data) || (data.location is map && data.location.latitude is number && data.location.longitude is number)) &&
-             (!('expiresAt' in data) || (data.expiresAt is timestamp));
+             (!('expiresAt' in data) || (data.expiresAt is timestamp || data.expiresAt == request.time)) &&
+             (!('imageURL' in data) || (data.imageURL is string && data.imageURL.size() < 500000));
     }
 
     function isValidNotification(data) {
-      return hasOnlyAllowedFields(['uid', 'text', 'read', 'type', 'sourceUid', 'listingId', 'createdAt']) &&
+      return hasOnlyAllowedFields(['id', 'uid', 'text', 'read', 'type', 'sourceUid', 'listingId', 'createdAt']) &&
              data.uid is string &&
              data.text is string && data.text.size() > 0 && data.text.size() < 500 &&
              data.read is bool &&
-             (!('type' in data) || data.type in ['listing', 'chat', 'follow']) &&
+             (!('type' in data) || data.type in ['listing', 'chat', 'follow', 'rating', 'deal']) &&
              (!('sourceUid' in data) || data.sourceUid is string) &&
              (!('listingId' in data) || data.listingId is string) &&
              (data.createdAt is timestamp || data.createdAt == request.time);
     }
 
-    function isValidFollow(data) {
-      return hasOnlyAllowedFields(['followerUid', 'followedUid', 'createdAt']) &&
-             data.followerUid is string && data.followerUid == request.auth.uid &&
-             data.followedUid is string && data.followedUid != request.auth.uid &&
+    function isValidRating(data) {
+      return hasOnlyAllowedFields(['id', 'fromUid', 'toUid', 'chatId', 'listingId', 'score', 'comment', 'createdAt']) &&
+             data.fromUid is string && data.fromUid == request.auth.uid &&
+             data.toUid is string && data.toUid != request.auth.uid &&
+             data.chatId is string &&
+             data.listingId is string &&
+             data.score is number && data.score >= 1 && data.score <= 5 &&
+             (!('comment' in data) || (data.comment is string && data.comment.size() < 500)) &&
              (data.createdAt is timestamp || data.createdAt == request.time);
     }
 
@@ -176,8 +183,13 @@ service cloud.firestore {
       allow create: if isOwner(uid) && isValidUser(request.resource.data) && (!('role' in request.resource.data) || request.resource.data.role == 'user');
       allow update: if isAuthenticated() && (
         (isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount']) && 
-         math.abs(request.resource.data.get('followersCount', 0) - resource.data.get('followersCount', 0)) == 1) ||
+        (request.resource.data.uid == resource.data.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount', 'updatedAt', 'rating', 'successfulDeals']) && 
+         (
+           math.abs(request.resource.data.get('followersCount', 0) - resource.data.get('followersCount', 0)) == 1 ||
+           (request.resource.data.get('successfulDeals', 0) - resource.data.get('successfulDeals', 0)) == 1 ||
+           (request.resource.data.rating is number)
+         )) ||
         isAdmin()
       );
     }
@@ -191,7 +203,11 @@ service cloud.firestore {
     match /listings/{listingId} {
       allow read: if true; // Publicly readable for marketplace
       allow create: if isAuthenticated() && isValidListing(request.resource.data);
-      allow update: if isAuthenticated() && (isDocOwner() || isAdmin()) && isValidListing(request.resource.data);
+      allow update: if isAuthenticated() && (
+        isDocOwner() || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) && request.resource.data.status == 'completed') ||
+        isAdmin()
+      ) && isValidListing(request.resource.data);
       allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
     }
 
@@ -209,7 +225,7 @@ service cloud.firestore {
 
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() && (request.auth.uid == resource.data.uid || isAdmin());
-      allow create: if isAuthenticated(); // Allow users to trigger notifications for others (e.g. on match)
+      allow create: if isAuthenticated() && isValidNotification(request.resource.data);
       allow update: if isAuthenticated() && (request.auth.uid == resource.data.uid || isAdmin());
     }
 
@@ -219,6 +235,11 @@ service cloud.firestore {
                     request.resource.data.followerUid == request.auth.uid &&
                     request.resource.data.followedUid != request.auth.uid;
       allow delete: if isAuthenticated() && resource.data.followerUid == request.auth.uid;
+    }
+
+    match /ratings/{ratingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidRating(request.resource.data);
     }
   }
 }

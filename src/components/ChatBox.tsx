@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc, getDoc, writeBatch, increment } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Chat, ChatMessage, Listing, UserProfile } from '../types';
-import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck, Plus, Tag, ShoppingCart, Phone, MapPin, Navigation, ExternalLink, MoreVertical, Timer, StopCircle } from 'lucide-react';
+import { Send, ArrowLeft, Loader2, MessageCircle, User, Clock, Check, CheckCheck, Plus, Tag, ShoppingCart, Phone, MapPin, Navigation, ExternalLink, MoreVertical, Timer, StopCircle, Image as ImageIcon, Camera, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { UserProfileView } from './UserProfileView';
@@ -17,12 +17,36 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sharingLocation, setSharingLocation] = useState(false);
-  const [showLocationOptions, setShowLocationOptions] = useState(false);
+  const [showAttachmentOptions, setShowAttachmentOptions] = useState(false);
+  const [showLocationSubmenu, setShowLocationSubmenu] = useState(false);
   const [liveLocationId, setLiveLocationId] = useState<string | null>(null);
   const [activeListing, setActiveListing] = useState<Listing | null>(null);
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
   const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingScore, setRatingScore] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+  const [isCompletingDeal, setIsCompletingDeal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const attachmentMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close attachment menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(event.target as Node)) {
+        setShowAttachmentOptions(false);
+        setShowLocationSubmenu(false);
+      }
+    };
+
+    if (showAttachmentOptions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showAttachmentOptions]);
 
   useEffect(() => {
     if (chats.length === 0) return;
@@ -199,12 +223,25 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
         chatId: activeChat.id,
         senderUid: user.uid,
         text,
+        type: 'text',
         createdAt: serverTimestamp(),
       });
 
       await updateDoc(doc(db, 'chats', activeChat.id), {
         lastMessage: text,
         updatedAt: serverTimestamp(),
+      });
+
+      // Notify other user
+      const otherUid = getOtherUserUid(activeChat);
+      await addDoc(collection(db, 'notifications'), {
+        uid: otherUid,
+        text: `New message from ${user.displayName || 'Farmer'}`,
+        read: false,
+        type: 'chat',
+        sourceUid: user.uid,
+        listingId: activeChat.listingId,
+        createdAt: serverTimestamp()
       });
     } catch (err) {
       console.error('Error sending message:', err);
@@ -213,11 +250,158 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !activeChat) return;
+
+    if (file.size > 300 * 1024) {
+      alert('Image size must be less than 300KB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      setSending(true);
+      try {
+        await addDoc(collection(db, 'chats', activeChat.id, 'messages'), {
+          chatId: activeChat.id,
+          senderUid: user.uid,
+          text: '📷 Sent a photo',
+          type: 'image',
+          imageURL: base64String,
+          createdAt: serverTimestamp(),
+        });
+
+        await updateDoc(doc(db, 'chats', activeChat.id), {
+          lastMessage: '📷 Sent a photo',
+          updatedAt: serverTimestamp(),
+        });
+
+        // Notify other user
+        const otherUid = getOtherUserUid(activeChat);
+        await addDoc(collection(db, 'notifications'), {
+          uid: otherUid,
+          text: `${user.displayName || 'Farmer'} sent a photo`,
+          read: false,
+          type: 'chat',
+          sourceUid: user.uid,
+          listingId: activeChat.listingId,
+          createdAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.error('Error uploading image:', err);
+      } finally {
+        setSending(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCompleteDeal = async () => {
+    if (!user || !activeChat || !activeListing) return;
+    
+    setIsCompletingDeal(true);
+    try {
+      const batch = writeBatch(db);
+      
+      // Update listing status
+      batch.update(doc(db, 'listings', activeListing.id), {
+        status: 'completed',
+        updatedAt: serverTimestamp()
+      });
+
+      // Add system message
+      const msgRef = doc(collection(db, 'chats', activeChat.id, 'messages'));
+      batch.set(msgRef, {
+        chatId: activeChat.id,
+        senderUid: 'system',
+        text: '🤝 Deal marked as completed! You can now rate each other.',
+        type: 'text',
+        createdAt: serverTimestamp()
+      });
+
+      // Notify other user
+      const otherUid = getOtherUserUid(activeChat);
+      batch.set(doc(collection(db, 'notifications')), {
+        uid: otherUid,
+        text: `Deal for ${activeListing.crop} completed! Please rate the farmer.`,
+        read: false,
+        type: 'deal',
+        sourceUid: user.uid,
+        listingId: activeListing.id,
+        createdAt: serverTimestamp()
+      });
+
+      await batch.commit();
+      
+      // Show rating modal if I am the buyer
+      if (user.uid === activeChat.buyerUid) {
+        setShowRatingModal(true);
+      }
+    } catch (err) {
+      console.error('Error completing deal:', err);
+    } finally {
+      setIsCompletingDeal(false);
+    }
+  };
+
+  const submitRating = async () => {
+    if (!user || !activeChat || !activeListing) return;
+
+    const targetUid = getOtherUserUid(activeChat);
+    try {
+      const batch = writeBatch(db);
+      
+      // Add rating doc
+      const ratingRef = doc(collection(db, 'ratings'));
+      batch.set(ratingRef, {
+        fromUid: user.uid,
+        toUid: targetUid,
+        chatId: activeChat.id,
+        listingId: activeListing.id,
+        score: ratingScore,
+        comment: ratingComment,
+        createdAt: serverTimestamp()
+      });
+
+      // Update user profile stats
+      const targetUserRef = doc(db, 'users', targetUid);
+      const targetProfile = userProfiles[targetUid];
+      const currentRating = targetProfile?.rating || 5.0;
+      const currentDeals = targetProfile?.successfulDeals || 0;
+      
+      // Simple moving average for rating
+      const newRating = ((currentRating * currentDeals) + ratingScore) / (currentDeals + 1);
+      
+      batch.update(targetUserRef, {
+        rating: newRating,
+        successfulDeals: increment(1),
+        updatedAt: serverTimestamp()
+      });
+
+      // Notify target user
+      batch.set(doc(collection(db, 'notifications')), {
+        uid: targetUid,
+        text: `You received a ${ratingScore}-star rating!`,
+        read: false,
+        type: 'rating',
+        sourceUid: user.uid,
+        createdAt: serverTimestamp()
+      });
+
+      await batch.commit();
+      setShowRatingModal(false);
+    } catch (err) {
+      console.error('Error submitting rating:', err);
+    }
+  };
+
   const handleShareLocation = async () => {
     if (!user || !activeChat || sharingLocation) return;
 
     setSharingLocation(true);
-    setShowLocationOptions(false);
+    setShowAttachmentOptions(false);
     
     try {
       if (!navigator.geolocation) {
@@ -258,7 +442,7 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
     if (!user || !activeChat || sharingLocation) return;
 
     setSharingLocation(true);
-    setShowLocationOptions(false);
+    setShowAttachmentOptions(false);
 
     try {
       if (!navigator.geolocation) {
@@ -426,6 +610,16 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {activeListing?.status === 'active' && (
+                  <button
+                    onClick={handleCompleteDeal}
+                    disabled={isCompletingDeal}
+                    className="flex items-center gap-2 px-3 py-2 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 transition-all text-xs font-bold"
+                  >
+                    {isCompletingDeal ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
+                    Complete Deal
+                  </button>
+                )}
                 {userProfiles[getOtherUserUid(activeChat)]?.phoneNumber && (
                   <a 
                     href={`tel:${userProfiles[getOtherUserUid(activeChat)].phoneNumber.replace(/\s+/g, '')}`}
@@ -475,9 +669,20 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
                         "px-4 py-3 rounded-2xl text-sm shadow-sm",
                         isMe 
                           ? "bg-[#2E7D32] text-white rounded-tr-none" 
-                          : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
+                          : "bg-white text-gray-800 rounded-tl-none border border-gray-100",
+                        msg.senderUid === 'system' && "bg-amber-50 text-amber-800 border-amber-100 italic mx-auto max-w-full rounded-xl text-center"
                       )}>
-                        {(msg.type === 'location' || msg.type === 'live_location') && msg.location ? (
+                        {msg.type === 'image' && msg.imageURL ? (
+                          <div className="space-y-2">
+                            <img 
+                              src={msg.imageURL} 
+                              alt="Sent" 
+                              className="max-w-full rounded-xl border border-gray-100 shadow-sm"
+                              referrerPolicy="no-referrer"
+                            />
+                            {msg.text && msg.text !== '📷 Sent a photo' && <p>{msg.text}</p>}
+                          </div>
+                        ) : (msg.type === 'location' || msg.type === 'live_location') && msg.location ? (
                           <div className="space-y-2 min-w-[200px]">
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-2 font-bold">
@@ -552,51 +757,112 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
             {/* Input */}
             <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-gray-100 relative">
               <AnimatePresence>
-                {showLocationOptions && (
+                {showAttachmentOptions && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute bottom-full left-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 min-w-[200px] z-50"
+                    ref={attachmentMenuRef}
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute bottom-full left-4 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 min-w-[220px] z-50 overflow-hidden"
                   >
-                    <button
-                      type="button"
-                      onClick={handleShareLocation}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-all text-sm font-medium text-gray-700"
-                    >
-                      <MapPin className="w-4 h-4 text-blue-500" />
-                      Current Location
-                    </button>
-                    <div className="border-t border-gray-50 my-1 py-1">
-                      <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Live Location</p>
-                      {[15, 60, 480].map(mins => (
+                    {!showLocationSubmenu ? (
+                      <div className="flex flex-col">
                         <button
-                          key={mins}
                           type="button"
-                          onClick={() => handleShareLiveLocation(mins)}
+                          onClick={() => {
+                            imageInputRef.current?.removeAttribute('capture');
+                            imageInputRef.current?.click();
+                            setShowAttachmentOptions(false);
+                          }}
                           className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-all text-sm font-medium text-gray-700"
                         >
-                          <Navigation className="w-4 h-4 text-red-500" />
-                          {mins === 15 ? '15 Minutes' : mins === 60 ? '1 Hour' : '8 Hours'}
+                          <ImageIcon className="w-4 h-4 text-purple-500" />
+                          Upload Photo
                         </button>
-                      ))}
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            imageInputRef.current?.setAttribute('capture', 'environment');
+                            imageInputRef.current?.click();
+                            setShowAttachmentOptions(false);
+                          }}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-all text-sm font-medium text-gray-700"
+                        >
+                          <Camera className="w-4 h-4 text-green-500" />
+                          Take Photo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowLocationSubmenu(true)}
+                          className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-all text-sm font-medium text-gray-700"
+                        >
+                          <div className="flex items-center gap-3">
+                            <MapPin className="w-4 h-4 text-blue-500" />
+                            Location
+                          </div>
+                          <ArrowLeft className="w-4 h-4 rotate-180 text-gray-300" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          onClick={() => setShowLocationSubmenu(false)}
+                          className="flex items-center gap-2 p-2 mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors"
+                        >
+                          <ArrowLeft className="w-3 h-3" />
+                          Back to Menu
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleShareLocation}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-all text-sm font-medium text-gray-700"
+                        >
+                          <MapPin className="w-4 h-4 text-blue-500" />
+                          Current Location
+                        </button>
+                        <div className="p-2 border-t border-gray-50 mt-1">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Live Location</p>
+                          {[15, 60, 480].map(mins => (
+                            <button
+                              key={mins}
+                              type="button"
+                              onClick={() => handleShareLiveLocation(mins)}
+                              className="w-full flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl transition-all text-sm font-medium text-gray-700"
+                            >
+                              <Navigation className="w-4 h-4 text-red-500" />
+                              {mins === 15 ? '15 Minutes' : mins === 60 ? '1 Hour' : '8 Hours'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
 
               <div className="flex gap-2">
+                <input
+                  type="file"
+                  ref={imageInputRef}
+                  onChange={handleImageUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
                 <button
                   type="button"
-                  onClick={() => setShowLocationOptions(!showLocationOptions)}
-                  disabled={sharingLocation}
+                  onClick={() => {
+                    setShowAttachmentOptions(!showAttachmentOptions);
+                    setShowLocationSubmenu(false);
+                  }}
+                  disabled={sharingLocation || sending}
                   className={cn(
                     "p-3 rounded-2xl transition-all disabled:opacity-50",
-                    showLocationOptions ? "bg-green-100 text-[#2E7D32]" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                    showAttachmentOptions ? "bg-green-100 text-[#2E7D32]" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
                   )}
-                  title="Location Options"
+                  title="Attachments"
                 >
-                  {sharingLocation ? <Loader2 className="w-5 h-5 animate-spin" /> : <Navigation className="w-5 h-5" />}
+                  {sharingLocation || sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
                 </button>
                 <input
                   type="text"
@@ -627,10 +893,71 @@ export const ChatBox: React.FC<{ initialChatId?: string | null }> = ({ initialCh
           </div>
         )}
       </div>
+      {/* Rating Modal */}
+      <AnimatePresence>
+        {showRatingModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-3xl p-8 shadow-2xl max-w-sm w-full border border-gray-100"
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-yellow-50 rounded-2xl flex items-center justify-center text-yellow-500 mx-auto mb-4">
+                  <Star className="w-8 h-8 fill-current" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">Rate the Farmer</h3>
+                <p className="text-sm text-gray-500 mt-2">How was your experience with this deal?</p>
+              </div>
+
+              <div className="flex justify-center gap-2 mb-8">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setRatingScore(star)}
+                    className="p-1 transition-transform hover:scale-110"
+                  >
+                    <Star 
+                      className={cn(
+                        "w-8 h-8 transition-colors",
+                        star <= ratingScore ? "text-yellow-400 fill-current" : "text-gray-200"
+                      )} 
+                    />
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                value={ratingComment}
+                onChange={(e) => setRatingComment(e.target.value)}
+                placeholder="Add a comment (optional)..."
+                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-green-500 outline-none transition-all resize-none mb-6"
+                rows={3}
+              />
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowRatingModal(false)}
+                  className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-50 rounded-2xl transition-all"
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={submitRating}
+                  className="flex-1 py-3 bg-[#2E7D32] text-white font-bold rounded-2xl shadow-lg shadow-green-100 hover:bg-[#1B5E20] transition-all"
+                >
+                  Submit
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* User Profile Modal */}
       <AnimatePresence>
         {viewingProfileUid && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <UserProfileView 
               uid={viewingProfileUid} 
               onClose={() => setViewingProfileUid(null)} 

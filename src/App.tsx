@@ -193,8 +193,19 @@ function AppContent() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full overflow-hidden">
-        {renderView()}
+      <main className="flex-1 w-full overflow-hidden relative">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeView}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.2 }}
+            className="h-full w-full"
+          >
+            {renderView()}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Navigation Bar */}

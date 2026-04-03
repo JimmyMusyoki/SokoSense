@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, deleteDoc, serverTimestamp, increment, updateDoc, writeBatch, setDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, deleteDoc, serverTimestamp, increment, updateDoc, writeBatch, setDoc, onSnapshot } from 'firebase/firestore';
 import { motion } from 'framer-motion';
 import { User, MapPin, Star, X, UserPlus, UserMinus, Loader2, Phone } from 'lucide-react';
 import { UserProfile, Follow } from '../types';
@@ -21,40 +21,49 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ uid, onClose }
   const [followDocId, setFollowDocId] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const docRef = doc(db, 'users', uid);
-        const docSnap = await getDoc(docRef);
+    const unsubscribeProfile = onSnapshot(doc(db, 'users', uid), 
+      (docSnap) => {
         if (docSnap.exists()) {
           setProfile(docSnap.data() as UserProfile);
+        } else {
+          // Provide a default profile for users who haven't fully set up yet
+          setProfile({
+            uid: uid,
+            displayName: 'Farmer',
+            followersCount: 0,
+            followingCount: 0,
+            rating: 5.0,
+            successfulDeals: 0
+          } as UserProfile);
         }
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-      } finally {
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error listening to user profile:', error);
         setLoading(false);
       }
-    };
+    );
 
-    const checkFollow = async () => {
-      if (!currentUser) return;
-      try {
-        const q = query(
-          collection(db, 'follows'),
-          where('followerUid', '==', currentUser.uid),
-          where('followedUid', '==', uid)
-        );
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          setIsFollowing(true);
-          setFollowDocId(querySnapshot.docs[0].id);
-        }
-      } catch (error) {
-        console.error('Error checking follow status:', error);
+    const q = query(
+      collection(db, 'follows'),
+      where('followerUid', '==', currentUser?.uid || ''),
+      where('followedUid', '==', uid)
+    );
+
+    const unsubscribeFollow = onSnapshot(q, (querySnapshot) => {
+      if (!querySnapshot.empty) {
+        setIsFollowing(true);
+        setFollowDocId(querySnapshot.docs[0].id);
+      } else {
+        setIsFollowing(false);
+        setFollowDocId(null);
       }
-    };
+    });
 
-    fetchProfile();
-    checkFollow();
+    return () => {
+      unsubscribeProfile();
+      unsubscribeFollow();
+    };
   }, [uid, currentUser]);
 
   const handleFollow = async () => {
@@ -68,7 +77,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ uid, onClose }
       if (isFollowing && followDocId) {
         // Unfollow
         batch.delete(doc(db, 'follows', followDocId));
-        batch.update(followedRef, { followersCount: increment(-1) });
+        batch.set(followedRef, { followersCount: increment(-1) }, { merge: true });
         batch.set(followerRef, { followingCount: increment(-1) }, { merge: true });
         
         await batch.commit();
@@ -84,8 +93,20 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ uid, onClose }
         };
         
         batch.set(followRef, followData);
-        batch.update(followedRef, { followersCount: increment(1) });
-        batch.set(followerRef, { followingCount: increment(1) }, { merge: true });
+        
+        // Ensure both users have basic profile fields if they don't exist
+        // This is especially important for anonymous/demo users
+        batch.set(followedRef, { 
+          uid: uid,
+          followersCount: increment(1),
+          updatedAt: serverTimestamp() 
+        }, { merge: true });
+        
+        batch.set(followerRef, { 
+          uid: currentUser.uid,
+          followingCount: increment(1),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
         
         // Notify the user
         const notificationRef = doc(collection(db, 'notifications'));

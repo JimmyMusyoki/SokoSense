@@ -263,112 +263,6 @@ export const Marketplace: React.FC = () => {
         </button>
       </div>
 
-      {/* Listing Form Modal */}
-      <AnimatePresence>
-        {showForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-800">{editingListing ? 'Update Listing' : 'Create Listing'}</h2>
-                <button onClick={() => { setShowForm(false); setEditingListing(null); resetForm(); }} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              
-              <form onSubmit={handleCreateListing} className="p-6 space-y-4">
-                {error && (
-                  <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-600 text-sm">
-                    <AlertCircle className="w-5 h-5 shrink-0" />
-                    <p className="font-medium">{error}</p>
-                  </div>
-                )}
-                <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setType('sell')}
-                    className={cn(
-                      "flex-1 py-2 rounded-lg text-sm font-bold transition-all",
-                      type === 'sell' ? "bg-white text-green-600 shadow-sm" : "text-gray-500"
-                    )}
-                  >
-                    I am Selling
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setType('buy')}
-                    className={cn(
-                      "flex-1 py-2 rounded-lg text-sm font-bold transition-all",
-                      type === 'buy' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500"
-                    )}
-                  >
-                    I am Buying
-                  </button>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Crop Name</label>
-                  <select
-                    value={crop}
-                    onChange={(e) => setCrop(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2E7D32] outline-none"
-                    required
-                  >
-                    {CROPS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Quantity</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
-                        className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2E7D32] outline-none"
-                        required
-                      />
-                      <select
-                        value={unit}
-                        onChange={(e) => setUnit(e.target.value)}
-                        className="w-24 px-2 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2E7D32] outline-none"
-                      >
-                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Price per {unit}</label>
-                    <input
-                      type="number"
-                      placeholder="Ksh"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2E7D32] outline-none"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full py-4 bg-[#2E7D32] text-white rounded-2xl font-bold shadow-lg hover:bg-[#1B5E20] disabled:opacity-50 transition-all flex items-center justify-center gap-2 mt-4"
-                >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingListing ? 'Update Listing' : 'Post Listing')}
-                </button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Listings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {loading ? (
@@ -485,10 +379,116 @@ export const Marketplace: React.FC = () => {
         )}
       </div>
 
+      {/* Listing Form Modal */}
+      <AnimatePresence>
+        {showForm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-800">{editingListing ? 'Update Listing' : 'Create Listing'}</h2>
+                <button onClick={() => { setShowForm(false); setEditingListing(null); resetForm(); }} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <form onSubmit={handleCreateListing} className="p-6 space-y-4">
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-600 text-sm">
+                    <AlertCircle className="w-5 h-5 shrink-0" />
+                    <p className="font-medium">{error}</p>
+                  </div>
+                )}
+                <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setType('sell')}
+                    className={cn(
+                      "flex-1 py-2 rounded-lg text-sm font-bold transition-all",
+                      type === 'sell' ? "bg-white text-green-600 shadow-sm" : "text-gray-500"
+                    )}
+                  >
+                    I am Selling
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setType('buy')}
+                    className={cn(
+                      "flex-1 py-2 rounded-lg text-sm font-bold transition-all",
+                      type === 'buy' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500"
+                    )}
+                  >
+                    I am Buying
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Crop Name</label>
+                  <select
+                    value={crop}
+                    onChange={(e) => setCrop(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2E7D32] outline-none"
+                    required
+                  >
+                    {CROPS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Quantity</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2E7D32] outline-none"
+                        required
+                      />
+                      <select
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value)}
+                        className="w-24 px-2 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2E7D32] outline-none"
+                      >
+                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Price per {unit}</label>
+                    <input
+                      type="number"
+                      placeholder="Ksh"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2E7D32] outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-4 bg-[#2E7D32] text-white rounded-2xl font-bold shadow-lg hover:bg-[#1B5E20] disabled:opacity-50 transition-all flex items-center justify-center gap-2 mt-4"
+                >
+                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingListing ? 'Update Listing' : 'Post Listing')}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* User Profile Modal */}
       <AnimatePresence>
         {viewingProfileUid && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <UserProfileView 
               uid={viewingProfileUid} 
               onClose={() => setViewingProfileUid(null)} 

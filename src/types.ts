@@ -65,7 +65,8 @@ export interface ChatMessage {
   chatId: string;
   senderUid: string;
   text: string;
-  type?: 'text' | 'location' | 'live_location';
+  type?: 'text' | 'location' | 'live_location' | 'image';
+  imageURL?: string;
   location?: {
     latitude: number;
     longitude: number;
@@ -80,12 +81,24 @@ export interface Notification {
   text: string;
   read: boolean;
   createdAt: any;
-  type?: 'listing' | 'chat' | 'follow';
+  type?: 'listing' | 'chat' | 'follow' | 'rating' | 'deal';
   sourceUid?: string;
   listingId?: string;
 }
 
+export interface Rating {
+  id: string;
+  fromUid: string;
+  toUid: string;
+  chatId: string;
+  listingId: string;
+  score: number;
+  comment?: string;
+  createdAt: any;
+}
+
 export interface Follow {
+  id: string;
   followerUid: string;
   followedUid: string;
   createdAt: any;

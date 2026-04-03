@@ -3,7 +3,7 @@ import { db, auth } from '../firebase';
 import { collection, query, where, onSnapshot, serverTimestamp, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Notification } from '../types';
-import { Bell, Check, Loader2, MessageSquare, Tag, ShoppingCart, ArrowRightLeft, X, UserPlus } from 'lucide-react';
+import { Bell, Check, Loader2, MessageSquare, Tag, ShoppingCart, ArrowRightLeft, X, UserPlus, Star, CheckCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { UserProfileView } from './UserProfileView';
@@ -43,6 +43,8 @@ export const Notifications: React.FC = () => {
 
   const getIcon = (n: Notification) => {
     if (n.type === 'follow') return <UserPlus className="w-5 h-5 text-indigo-500" />;
+    if (n.type === 'rating') return <Star className="w-5 h-5 text-yellow-500 fill-current" />;
+    if (n.type === 'deal') return <CheckCheck className="w-5 h-5 text-green-500" />;
     const text = n.text.toLowerCase();
     if (text.includes('match')) return <ArrowRightLeft className="w-5 h-5 text-amber-500" />;
     if (text.includes('message')) return <MessageSquare className="w-5 h-5 text-blue-500" />;
@@ -125,7 +127,7 @@ export const Notifications: React.FC = () => {
       {/* User Profile Modal */}
       <AnimatePresence>
         {viewingProfileUid && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <UserProfileView 
               uid={viewingProfileUid} 
               onClose={() => setViewingProfileUid(null)} 
