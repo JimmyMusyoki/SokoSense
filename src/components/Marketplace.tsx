@@ -40,14 +40,6 @@ export const Marketplace: React.FC = () => {
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
 
   useEffect(() => {
-    const handleViewProfile = (e: any) => {
-      setViewingProfileUid(e.detail);
-    };
-    window.addEventListener('viewProfile', handleViewProfile);
-    return () => window.removeEventListener('viewProfile', handleViewProfile);
-  }, []);
-
-  useEffect(() => {
     let q = query(
       collection(db, 'listings'),
       where('status', '==', 'active'),
@@ -620,16 +612,6 @@ export const Marketplace: React.FC = () => {
       </AnimatePresence>
 
       {/* User Profile Modal */}
-      <AnimatePresence>
-        {viewingProfileUid && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
-            <UserProfileView 
-              uid={viewingProfileUid} 
-              onClose={() => setViewingProfileUid(null)} 
-            />
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

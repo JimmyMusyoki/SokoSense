@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePinLock } from '../contexts/PinLockContext';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { motion } from 'framer-motion';
-import { User, Camera, Loader2, Check, X, LogOut, MapPin, Info, Star, Users, UserCheck } from 'lucide-react';
+import { User, Camera, Loader2, Check, X, LogOut, MapPin, Info, Star, Users, UserCheck, Share2, Shield } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { cn } from '../lib/utils';
 import { FollowLists } from './FollowLists';
@@ -16,6 +17,7 @@ interface ProfileProps {
 
 export const Profile: React.FC<ProfileProps> = ({ onClose }) => {
   const { user, profile } = useAuth();
+  const { timeoutMinutes, setTimeoutMinutes } = usePinLock();
   const [displayName, setDisplayName] = useState(profile?.displayName || '');
   const [about, setAbout] = useState(profile?.about || '');
   const [location, setLocation] = useState(profile?.location || '');
@@ -23,7 +25,7 @@ export const Profile: React.FC<ProfileProps> = ({ onClose }) => {
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'edit' | 'followers' | 'following'>('edit');
-  const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync local state with profile if it updates in background
@@ -91,24 +93,30 @@ export const Profile: React.FC<ProfileProps> = ({ onClose }) => {
     }
   };
 
-  useEffect(() => {
-    const handleViewProfile = (e: any) => {
-      setViewingProfileUid(e.detail);
-    };
-    window.addEventListener('viewProfile', handleViewProfile);
-    return () => window.removeEventListener('viewProfile', handleViewProfile);
-  }, []);
-
-  if (viewingProfileUid) {
-    return (
-      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-        <UserProfileView 
-          uid={viewingProfileUid} 
-          onClose={() => setViewingProfileUid(null)} 
-        />
-      </div>
-    );
-  }
+  const handleShareProfile = async () => {
+    if (!user) return;
+    const shareUrl = `${window.location.origin}${window.location.pathname}?profile=${user.uid}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `SokoSense Profile: ${profile?.displayName || 'Farmer'}`,
+          text: `Check out my farmer profile on SokoSense!`,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.error('Error sharing:', err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setIsSharing(true);
+        setTimeout(() => setIsSharing(false), 2000);
+      } catch (err) {
+        console.error('Error copying to clipboard:', err);
+      }
+    }
+  };
 
   return (
     <motion.div
@@ -245,6 +253,27 @@ export const Profile: React.FC<ProfileProps> = ({ onClose }) => {
                 />
               </div>
 
+              {/* PIN Timeout Setting */}
+              <div className="space-y-2 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <Shield className="w-4 h-4 text-[#2E7D32]" />
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Security Timeout</label>
+                </div>
+                <p className="text-[10px] text-gray-400 font-medium mb-2">Require PIN after inactivity or backgrounding</p>
+                <select
+                  value={timeoutMinutes}
+                  onChange={(e) => setTimeoutMinutes(parseInt(e.target.value, 10))}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                >
+                  <option value={1}>1 Minute</option>
+                  <option value={5}>5 Minutes</option>
+                  <option value={15}>15 Minutes</option>
+                  <option value={30}>30 Minutes</option>
+                  <option value={60}>1 Hour</option>
+                  <option value={1440}>24 Hours</option>
+                </select>
+              </div>
+
               <button
                 onClick={handleUpdateProfile}
                 disabled={isUpdating || !displayName.trim() || (displayName === profile?.displayName && about === profile?.about && location === profile?.location)}
@@ -269,13 +298,37 @@ export const Profile: React.FC<ProfileProps> = ({ onClose }) => {
 
               <div className="pt-4 border-t border-gray-100">
                 <SuggestedFollows />
-                <button
-                  onClick={() => signOut(auth)}
-                  className="w-full py-3 text-red-500 font-bold flex items-center justify-center gap-2 hover:bg-red-50 rounded-2xl transition-all mt-4"
-                >
-                  <LogOut className="w-5 h-5" />
-                  Logout
-                </button>
+                
+                <div className="flex gap-2 mt-6">
+                  <button
+                    onClick={handleShareProfile}
+                    className={cn(
+                      "flex-1 py-3 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 border",
+                      isSharing 
+                        ? "bg-green-50 text-green-700 border-green-100" 
+                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                    )}
+                  >
+                    {isSharing ? (
+                      <>
+                        <Check className="w-5 h-5" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-5 h-5" />
+                        Share Profile
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => signOut(auth)}
+                    className="flex-1 py-3 text-red-500 font-bold flex items-center justify-center gap-2 hover:bg-red-50 rounded-2xl transition-all border border-transparent hover:border-red-100"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    Logout
+                  </button>
+                </div>
               </div>
             </div>
           </div>

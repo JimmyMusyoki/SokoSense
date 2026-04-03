@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, deleteDoc, serverTimestamp, increment, updateDoc, writeBatch, setDoc, onSnapshot } from 'firebase/firestore';
 import { motion } from 'framer-motion';
-import { User, MapPin, Star, X, UserPlus, UserMinus, Loader2, Phone } from 'lucide-react';
+import { User, MapPin, Star, X, UserPlus, UserMinus, Loader2, Phone, Share2, Check } from 'lucide-react';
 import { UserProfile, Follow } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -20,6 +20,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ uid, onClose }
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [followDocId, setFollowDocId] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     const unsubscribeProfile = onSnapshot(doc(db, 'users', uid), 
@@ -131,6 +132,30 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ uid, onClose }
     }
   };
 
+  const handleShareProfile = async () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?profile=${uid}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `SokoSense Profile: ${profile?.displayName || 'Farmer'}`,
+          text: `Check out this farmer profile on SokoSense!`,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.error('Error sharing:', err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setIsSharing(true);
+        setTimeout(() => setIsSharing(false), 2000);
+      } catch (err) {
+        console.error('Error copying to clipboard:', err);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -148,7 +173,18 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ uid, onClose }
       className="bg-white rounded-3xl p-6 shadow-xl max-w-md w-full mx-auto border border-gray-100"
     >
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-xl font-bold text-gray-800">User Profile</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold text-gray-800">User Profile</h2>
+          <button 
+            onClick={handleShareProfile}
+            className={cn(
+              "p-2 rounded-full transition-all",
+              isSharing ? "bg-green-50 text-green-600" : "hover:bg-gray-100 text-gray-400"
+            )}
+          >
+            {isSharing ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+          </button>
+        </div>
         <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
           <X className="w-5 h-5 text-gray-400" />
         </button>

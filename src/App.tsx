@@ -6,11 +6,14 @@ import { extractMarketInfo, generateAdvice } from "./services/geminiService";
 import { getPrice, predictPrice } from "./services/marketService";
 import { cn } from "./lib/utils";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { PinLockProvider } from "./contexts/PinLockContext";
 import { Login } from "./components/Login";
 import { Marketplace } from "./components/Marketplace";
 import { ChatBox } from "./components/ChatBox";
 import { Notifications } from "./components/Notifications";
 import { Profile } from "./components/Profile";
+import { UserProfileView } from "./components/UserProfileView";
+import { PinLock } from "./components/PinLock";
 import KilimoStats from "./components/KilimoStats";
 import { auth } from "./firebase";
 import { signOut } from "firebase/auth";
@@ -80,9 +83,12 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <ErrorBoundary>
-        <AppContent />
-      </ErrorBoundary>
+      <PinLockProvider>
+        <ErrorBoundary>
+          <AppContent />
+          <PinLock />
+        </ErrorBoundary>
+      </PinLockProvider>
     </AuthProvider>
   );
 }
@@ -93,8 +99,19 @@ function AppContent() {
   const { user, profile, loading } = useAuth();
   const [activeView, setActiveView] = useState<View>("ai");
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
 
   useEffect(() => {
+    // Handle query parameters
+    const params = new URLSearchParams(window.location.search);
+    const profileUid = params.get('profile');
+    if (profileUid) {
+      setViewingProfileUid(profileUid);
+      // Clear the parameter from URL without reloading
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+
     const handleOpenChat = (e: any) => {
       setSelectedChatId(e.detail);
       setActiveView("chat");
@@ -102,11 +119,16 @@ function AppContent() {
     const handleChangeView = (e: any) => {
       setActiveView(e.detail);
     };
+    const handleViewProfile = (e: any) => {
+      setViewingProfileUid(e.detail);
+    };
     window.addEventListener('openChat', handleOpenChat);
     window.addEventListener('changeView', handleChangeView);
+    window.addEventListener('viewProfile', handleViewProfile);
     return () => {
       window.removeEventListener('openChat', handleOpenChat);
       window.removeEventListener('changeView', handleChangeView);
+      window.removeEventListener('viewProfile', handleViewProfile);
     };
   }, []);
 
@@ -241,6 +263,18 @@ function AppContent() {
           label="Alerts" 
         />
       </nav>
+
+      {/* User Profile Modal */}
+      <AnimatePresence>
+        {viewingProfileUid && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
+            <UserProfileView 
+              uid={viewingProfileUid} 
+              onClose={() => setViewingProfileUid(null)} 
+            />
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Footer */}
       <footer className="p-4 text-center text-xs text-gray-400 font-medium">
