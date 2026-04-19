@@ -6,18 +6,18 @@ import { extractMarketInfo, generateAdvice } from "./services/geminiService";
 import { getPrice, predictPrice } from "./services/marketService";
 import { cn } from "./lib/utils";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { PinLockProvider } from "./contexts/PinLockContext";
 import { Login } from "./components/Login";
 import { Marketplace } from "./components/Marketplace";
 import { ChatBox } from "./components/ChatBox";
 import { Notifications } from "./components/Notifications";
 import { Profile } from "./components/Profile";
 import { UserProfileView } from "./components/UserProfileView";
-import { PinLock } from "./components/PinLock";
 import KilimoStats from "./components/KilimoStats";
 import { auth } from "./firebase";
 import { signOut } from "firebase/auth";
 import { CROPS } from "./constants";
+
+import { useMarketPrices } from "./hooks/useMarketPrices";
 
 interface Message {
   id: string;
@@ -83,12 +83,9 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <PinLockProvider>
-        <ErrorBoundary>
-          <AppContent />
-          <PinLock />
-        </ErrorBoundary>
-      </PinLockProvider>
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </AuthProvider>
   );
 }
@@ -288,12 +285,13 @@ function MainApp({ setActiveView }: { setActiveView: (view: View) => void }) {
   console.log("MainApp rendering...");
   console.log("API Key present:", !!process.env.GEMINI_API_KEY);
 
+  const livePrices = useMarketPrices();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
       role: "assistant",
-      content: "Hujambo! Mimi ni SokoSense AI. Niko hapa kukusaidia kupata bei bora ya mazao yako. \n\nUnaweza pia kutumia **Marketplace** yetu kupata wanunuzi ama wauzaji wa mazao yako moja kwa moja! \n\nSema ama uandike kile uko nacho leo, kwa mfano: 'Niko na gunia 5 za nyanya Leo.'",
+      content: "Hujambo! Mimi ni SokoSense AI. Niko hapa kukusaidia kupata bei bora ya mazao yako kama **nyanya**, **mahindi**, **maharagwe**, na **viazi**. \n\nUnaweza pia kutumia **Marketplace** yetu kupata wanunuzi ama wauzaji wa mazao yako moja kwa moja! \n\nSema ama uandike kile uko nacho leo, kwa mfano: 'Niko na gunia 5 za mahindi' au 'Uko na bei gani ya viazi?'",
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
@@ -483,12 +481,18 @@ function MainApp({ setActiveView }: { setActiveView: (view: View) => void }) {
               animate={{ opacity: 1, scale: 1 }}
               key={crop}
               onClick={() => setInput(`Niko na gunia 3 za ${crop.split(' (')[0].toLowerCase()} leo`)}
-              className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-[#2E7D32] hover:bg-green-50 transition-all group shadow-sm"
+              className="bg-white border border-gray-200 rounded-2xl p-3 text-left hover:border-[#2E7D32] hover:bg-green-50 transition-all group shadow-sm relative overflow-hidden"
             >
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Check Price</p>
-              <div className="flex items-center justify-between">
+              <div className="absolute top-0 right-0 p-1">
+                <div className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
+              </div>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Live Price</p>
+              <div className="flex flex-col">
                 <span className="font-bold text-gray-700 text-sm truncate pr-2">{crop}</span>
-                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-[#2E7D32] transition-colors shrink-0" />
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-xs font-bold text-[#2E7D32]">KES {livePrices[crop] || '...'}/kg</span>
+                  <ChevronRight className="w-3 h-3 text-gray-300 group-hover:text-[#2E7D32] transition-colors shrink-0" />
+                </div>
               </div>
             </motion.button>
           ))}

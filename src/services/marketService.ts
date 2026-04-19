@@ -32,3 +32,13 @@ export function predictPrice(crop: string, todayDate: string, market: string = "
 
   return entry.price_per_kg;
 }
+
+export function getAllInitialPrices(date: string, market: string = "Wakulima"): Record<string, number> {
+  const prices: Record<string, number> = {};
+  (marketHistory as MarketEntry[]).forEach(entry => {
+    if (entry.date === date && entry.market === market) {
+      prices[entry.crop] = entry.price_per_kg;
+    }
+  });
+  return prices;
+}

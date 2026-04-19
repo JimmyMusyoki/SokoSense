@@ -82,7 +82,7 @@ export async function extractMarketInfo(userInput: string): Promise<ExtractionRe
         
         Schema:
         {
-          "crop": string (e.g., "tomatoes", "onions", "beans", "cabbage", "carrots", "sukuma wiki", "avocado", "maize", "potatoes", "bananas", "mangoes", "watermelon", "pineapple", "capsicum", "garlic", "ginger", "sweet potatoes", "cassava", "coffee", "tea", "macadamia", "passion fruit", "oranges", "lemons", "spinach", "managu", "terere", "sagaa", "kunde", "arrowroots", "wheat", "rice", "sorghum", "millet", "green grams", "cowpeas", "pigeon peas", "groundnuts", "sunflowers", "soya beans", "pumpkin", "cucumber", "eggplant", "broccoli", "cauliflower", "lettuce", "celery", "parsley", "coriander", "mint", "rosemary", "thyme", "basil", "turmeric", "chili", "black pepper", "cardamom", "cinnamon", "cloves", "vanilla", "cocoa", "tobacco", "cotton", "pyrethrum", "sisal", "sugar cane"),
+          "crop": string (e.g., "tomatoes", "maize", "beans", "potatoes", "onions", "cabbage", "carrots", "sukuma wiki", "avocado", ...),
           "quantity": number,
           "unit": string,
           "date": string (YYYY-MM-DD),
