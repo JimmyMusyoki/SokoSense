@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, handleFirestoreError, OperationType } from '../firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, handleFirestoreError, OperationType, sendPasswordResetEmail } from '../firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { Loader2, Mail, Phone, Lock, User as UserIcon, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Loader2, Mail, Phone, Lock, User as UserIcon, CheckCircle2, AlertCircle, ArrowRight, HelpCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { UserProfile } from '../types';
 
 export const Login: React.FC = () => {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [identifier, setIdentifier] = useState(''); // Email or Phone
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -14,11 +14,17 @@ export const Login: React.FC = () => {
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // Firebase requires at least 6 characters for passwords.
   // We'll append a constant salt to the 4-digit PIN.
   const PIN_SALT = "SokoSense2026"; 
-  const getPasswordFromPin = (p: string) => p + PIN_SALT;
+  const getPasswordFromPin = (p: string) => {
+    // If it's a 4-digit numeric string, salt it. 
+    // Otherwise assume it's a reset password and return as is.
+    if (/^\d{4}$/.test(p)) return p + PIN_SALT;
+    return p;
+  };
 
   const normalizePhone = (phone: string) => {
     // Remove all non-digit characters
@@ -36,10 +42,11 @@ export const Login: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!identifier.trim() || pin.length !== 4) return;
+    if (!identifier.trim() || pin.length < 4) return;
     
     setLoading(true);
     setError(null);
+    setSuccess(null);
     
     try {
       let loginEmail = identifier;
@@ -81,12 +88,47 @@ export const Login: React.FC = () => {
     }
   };
 
+  const handleForgotPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!identifier.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      let resetEmail = identifier;
+      
+      if (!identifier.includes('@')) {
+        const cleanPhone = normalizePhone(identifier);
+        const phoneDoc = await getDoc(doc(db, 'phone_to_email', cleanPhone));
+        if (!phoneDoc.exists()) {
+          throw new Error('No account found with this phone number.');
+        }
+        resetEmail = phoneDoc.data().email;
+      }
+      
+      await sendPasswordResetEmail(auth, resetEmail);
+      setSuccess(`Reset instructions sent to ${resetEmail}. Note: You will need to set a password of at least 6 characters.`);
+    } catch (err: any) {
+      console.error('Forgot PIN error:', err);
+      if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email/phone.');
+      } else {
+        setError(err.message || 'Failed to send reset email. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !phoneNumber.trim() || pin.length !== 4) return;
     
     setLoading(true);
     setError(null);
+    setSuccess(null);
     
     try {
       const cleanPhone = normalizePhone(phoneNumber);
@@ -160,6 +202,7 @@ export const Login: React.FC = () => {
   const handleDemoLogin = async () => {
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       await signInAnonymously(auth);
     } catch (err: any) {
@@ -175,17 +218,19 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
         <div className="flex justify-center mb-6">
           <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center text-[#2E7D32]">
-            <Lock className="w-8 h-8" />
+            {mode === 'forgot' ? <HelpCircle className="w-8 h-8" /> : <Lock className="w-8 h-8" />}
           </div>
         </div>
         
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">
-          {mode === 'login' ? 'Karibu Tena' : 'Create Account'}
+          {mode === 'login' ? 'Karibu Tena' : mode === 'signup' ? 'Create Account' : 'Forgot PIN?'}
         </h2>
         <p className="text-center text-gray-500 mb-8 text-sm">
           {mode === 'login' 
             ? 'Login with your email or phone number and PIN.' 
-            : 'Join SokoSense to start trading your produce.'}
+            : mode === 'signup'
+            ? 'Join SokoSense to start trading your produce.'
+            : 'Enter your email or phone to receive reset instructions.'}
         </p>
 
         {error && (
@@ -195,25 +240,32 @@ export const Login: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={mode === 'login' ? handleLogin : handleSignup} className="space-y-4">
-          {mode === 'login' ? (
-            <>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Email or Phone</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="example@mail.com or +254..."
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    className="w-full pl-12 pr-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#2E7D32] outline-none transition-all"
-                    required
-                  />
-                  <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                </div>
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-2xl flex items-start gap-3 text-green-600 text-sm">
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
+            <p className="font-medium leading-relaxed">{success}</p>
+          </div>
+        )}
+
+        <form onSubmit={mode === 'login' ? handleLogin : mode === 'signup' ? handleSignup : handleForgotPin} className="space-y-4">
+          {(mode === 'login' || mode === 'forgot') && (
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Email or Phone</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="example@mail.com or +254..."
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  className="w-full pl-12 pr-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#2E7D32] outline-none transition-all"
+                  required
+                />
+                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               </div>
-            </>
-          ) : (
+            </div>
+          )}
+
+          {mode === 'signup' && (
             <>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
@@ -260,52 +312,99 @@ export const Login: React.FC = () => {
             </>
           )}
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">4-Digit PIN</label>
-            <div className="relative">
-              <input
-                type="password"
-                placeholder="****"
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                className="w-full pl-12 pr-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#2E7D32] outline-none transition-all text-2xl tracking-[0.5em]"
-                required
-              />
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          {mode !== 'forgot' && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">PIN / Password</label>
+                {mode === 'login' && (
+                  <button 
+                    type="button"
+                    onClick={() => setMode('forgot')}
+                    className="text-[10px] font-bold text-[#2E7D32] uppercase tracking-widest hover:underline"
+                  >
+                    Forgot PIN?
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="password"
+                  placeholder={mode === 'signup' ? "****" : "PIN or Reset Password"}
+                  value={pin}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    // If signup, strictly 4 digits. If login, allow more for reset passwords.
+                    if (mode === 'signup') {
+                      setPin(val.replace(/\D/g, '').slice(0, 4));
+                    } else {
+                      setPin(val);
+                    }
+                  }}
+                  className={cn(
+                    "w-full pl-12 pr-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#2E7D32] outline-none transition-all",
+                    pin.length === 4 && /^\d+$/.test(pin) ? "text-2xl tracking-[0.5em]" : "text-lg"
+                  )}
+                  required
+                />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              </div>
             </div>
-          </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full py-4 bg-[#2E7D32] text-white rounded-2xl font-bold shadow-lg shadow-green-100 hover:bg-[#1B5E20] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (mode === 'login' ? 'Login' : 'Create Account')}
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+              mode === 'login' ? 'Login' : mode === 'signup' ? 'Create Account' : 'Send Reset Link'}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-            className="text-sm font-bold text-[#2E7D32] hover:underline"
-          >
-            {mode === 'login' ? "Don't have an account? Sign Up" : "Already have an account? Login"}
-          </button>
+        <div className="mt-6 text-center space-y-2">
+          {mode !== 'signup' && (
+            <button
+              onClick={() => {
+                setMode('signup');
+                setError(null);
+                setSuccess(null);
+              }}
+              className="block w-full text-sm font-bold text-[#2E7D32] hover:underline"
+            >
+              Don't have an account? Sign Up
+            </button>
+          )}
+          {mode !== 'login' && (
+            <button
+              onClick={() => {
+                setMode('login');
+                setError(null);
+                setSuccess(null);
+              }}
+              className="block w-full text-sm font-bold text-[#2E7D32] hover:underline"
+            >
+              Already have an account? Login
+            </button>
+          )}
         </div>
 
-        <div className="relative flex items-center gap-4 my-6">
-          <div className="h-[1px] flex-1 bg-gray-100"></div>
-          <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">Or</span>
-          <div className="h-[1px] flex-1 bg-gray-100"></div>
-        </div>
+        {mode !== 'forgot' && (
+          <>
+            <div className="relative flex items-center gap-4 my-6">
+              <div className="h-[1px] flex-1 bg-gray-100"></div>
+              <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">Or</span>
+              <div className="h-[1px] flex-1 bg-gray-100"></div>
+            </div>
 
-        <button
-          onClick={handleDemoLogin}
-          disabled={loading}
-          className="w-full py-4 bg-white text-gray-700 border-2 border-gray-100 rounded-2xl font-bold hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-        >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Try Demo Mode'}
-        </button>
+            <button
+              onClick={handleDemoLogin}
+              disabled={loading}
+              className="w-full py-4 bg-white text-gray-700 border-2 border-gray-100 rounded-2xl font-bold hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Try Demo Mode'}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
