@@ -30,6 +30,7 @@ export const Marketplace: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<'all' | 'buy' | 'sell'>('all');
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
   const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -167,6 +168,7 @@ export const Marketplace: React.FC = () => {
 
   const resetFilters = () => {
     setSelectedCrop(null);
+    setSelectedType('all');
     setMinPrice('');
     setMaxPrice('');
     setMinQuantity('');
@@ -208,6 +210,9 @@ export const Marketplace: React.FC = () => {
     ? listings 
     : listings.filter(l => l.uid === user?.uid)
   ).filter(l => {
+    // Type filter
+    if (selectedType !== 'all' && l.type !== selectedType) return false;
+
     // Price filter
     if (minPrice && l.price < Number(minPrice)) return false;
     if (maxPrice && l.price > Number(maxPrice)) return false;
@@ -367,26 +372,60 @@ export const Marketplace: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 p-1 bg-gray-100 rounded-2xl w-fit">
-        <button
-          onClick={() => setActiveTab('all')}
-          className={cn(
-            "px-6 py-2 rounded-xl text-sm font-bold transition-all",
-            activeTab === 'all' ? "bg-white text-[#2E7D32] shadow-sm" : "text-gray-500 hover:text-gray-700"
-          )}
-        >
-          All Listings
-        </button>
-        <button
-          onClick={() => setActiveTab('my')}
-          className={cn(
-            "px-6 py-2 rounded-xl text-sm font-bold transition-all",
-            activeTab === 'my' ? "bg-white text-[#2E7D32] shadow-sm" : "text-gray-500 hover:text-gray-700"
-          )}
-        >
-          My Listings
-        </button>
+      {/* Tabs and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-2xl w-fit">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={cn(
+              "px-6 py-2 rounded-xl text-sm font-bold transition-all",
+              activeTab === 'all' ? "bg-white text-[#2E7D32] shadow-sm" : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            All Listings
+          </button>
+          <button
+            onClick={() => setActiveTab('my')}
+            className={cn(
+              "px-6 py-2 rounded-xl text-sm font-bold transition-all",
+              activeTab === 'my' ? "bg-white text-[#2E7D32] shadow-sm" : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            My Listings
+          </button>
+        </div>
+
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-2xl w-fit">
+          <button
+            onClick={() => setSelectedType('all')}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-bold transition-all",
+              selectedType === 'all' ? "bg-white text-[#2E7D32] shadow-sm" : "text-gray-500"
+            )}
+          >
+            Mixed
+          </button>
+          <button
+            onClick={() => setSelectedType('sell')}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2",
+              selectedType === 'sell' ? "bg-white text-green-600 shadow-sm" : "text-gray-500"
+            )}
+          >
+            <Tag className="w-3 h-3" />
+            Selling
+          </button>
+          <button
+            onClick={() => setSelectedType('buy')}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2",
+              selectedType === 'buy' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500"
+            )}
+          >
+            <ShoppingCart className="w-3 h-3" />
+            Buying
+          </button>
+        </div>
       </div>
 
       {/* Listings Grid */}
