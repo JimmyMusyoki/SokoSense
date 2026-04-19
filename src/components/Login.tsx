@@ -20,6 +20,20 @@ export const Login: React.FC = () => {
   const PIN_SALT = "SokoSense2026"; 
   const getPasswordFromPin = (p: string) => p + PIN_SALT;
 
+  const normalizePhone = (phone: string) => {
+    // Remove all non-digit characters
+    let cleaned = phone.replace(/\D/g, '');
+    // If it starts with 0 and has 10 digits, replace 0 with 254
+    if (cleaned.startsWith('0') && cleaned.length === 10) {
+      cleaned = '254' + cleaned.substring(1);
+    }
+    // If it's 9 digits, assume it needs 254
+    if (cleaned.length === 9) {
+      cleaned = '254' + cleaned;
+    }
+    return cleaned;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identifier.trim() || pin.length !== 4) return;
@@ -32,31 +46,33 @@ export const Login: React.FC = () => {
       
       // If identifier is a phone number (doesn't contain @)
       if (!identifier.includes('@')) {
-        const cleanPhone = identifier.replace(/\s+/g, '');
+        const cleanPhone = normalizePhone(identifier);
         const path = `phone_to_email/${cleanPhone}`;
         try {
           const phoneDoc = await getDoc(doc(db, 'phone_to_email', cleanPhone));
           if (!phoneDoc.exists()) {
-            throw new Error('No account found with this phone number.');
+            throw new Error('No account found with this phone number. Please sign up!');
           }
           loginEmail = phoneDoc.data().email;
         } catch (err: any) {
-          if (err.message === 'No account found with this phone number.') throw err;
+          if (err.message.includes('No account found')) throw err;
           handleFirestoreError(err, OperationType.GET, path);
         }
       }
       
-      await signInWithEmailAndPassword(auth, loginEmail, getPasswordFromPin(pin));
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), getPasswordFromPin(pin));
     } catch (err: any) {
       console.error('Login error:', err);
       if (err.code === 'auth/operation-not-allowed') {
-        setError('Email/Password authentication is not enabled in your Firebase project. Please go to the Firebase Console > Authentication > Sign-in method and enable "Email/Password".');
-      } else if (err.code === 'auth/invalid-credential') {
-        setError('Incorrect email/phone or PIN. If you are a developer, please ensure Email/Password auth is enabled in the Firebase Console.');
+        setError('Email/Password authentication is not enabled in your Firebase project. Please go to the Firebase Console and enable it.');
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-email') {
+        setError('Incorrect email/phone or PIN. Please double-check your credentials.');
       } else if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email. Please sign up instead.');
+        setError('No account found with this email. Please check your spelling or sign up.');
       } else if (err.code === 'auth/wrong-password') {
         setError('Incorrect PIN. Please try again.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many failed attempts. Please try again later.');
       } else {
         setError(err.message || 'Login failed. Please check your credentials.');
       }
@@ -73,22 +89,26 @@ export const Login: React.FC = () => {
     setError(null);
     
     try {
-      const cleanPhone = phoneNumber.replace(/\s+/g, '');
+      const cleanPhone = normalizePhone(phoneNumber);
       
       // 1. Check if phone already mapped
       const phonePath = `phone_to_email/${cleanPhone}`;
       try {
         const phoneDoc = await getDoc(doc(db, 'phone_to_email', cleanPhone));
         if (phoneDoc.exists()) {
-          throw new Error('This phone number is already registered.');
+          setError(`This phone (${cleanPhone}) is already registered.`);
+          setIdentifier(phoneNumber);
+          setMode('login');
+          setLoading(false);
+          return;
         }
       } catch (err: any) {
-        if (err.message === 'This phone number is already registered.') throw err;
         handleFirestoreError(err, OperationType.GET, phonePath);
       }
       
       // 2. Create Auth User
-      const userCredential = await createUserWithEmailAndPassword(auth, email, getPasswordFromPin(pin));
+      // Trim email to avoid hidden character issues
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), getPasswordFromPin(pin));
       const user = userCredential.user;
       
       // 3. Create User Profile
