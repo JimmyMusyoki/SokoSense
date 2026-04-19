@@ -51,6 +51,12 @@ export const Login: React.FC = () => {
       console.error('Login error:', err);
       if (err.code === 'auth/operation-not-allowed') {
         setError('Email/Password authentication is not enabled in your Firebase project. Please go to the Firebase Console > Authentication > Sign-in method and enable "Email/Password".');
+      } else if (err.code === 'auth/invalid-credential') {
+        setError('Incorrect email/phone or PIN. If you are a developer, please ensure Email/Password auth is enabled in the Firebase Console.');
+      } else if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email. Please sign up instead.');
+      } else if (err.code === 'auth/wrong-password') {
+        setError('Incorrect PIN. Please try again.');
       } else {
         setError(err.message || 'Login failed. Please check your credentials.');
       }
@@ -117,6 +123,12 @@ export const Login: React.FC = () => {
       console.error('Signup error:', err);
       if (err.code === 'auth/operation-not-allowed') {
         setError('Email/Password authentication is not enabled in your Firebase project. Please go to the Firebase Console > Authentication > Sign-in method and enable "Email/Password".');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('This email is already in use. Please login instead.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('The PIN is too weak. Please try a different combination.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please provide a valid email address.');
       } else {
         setError(err.message || 'Signup failed. Please try again.');
       }
